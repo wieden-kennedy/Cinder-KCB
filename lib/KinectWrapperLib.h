@@ -1,30 +1,27 @@
 #pragma once
 
-#define WIN32_LEAN_AND_MEAN             // Exclude rarely-used stuff from Windows headers
+#define WIN32_LEAN_AND_MEAN		// Exclude rarely-used stuff from Windows headers
 
 // Windows Header Files:
 #include <windows.h>
 #include <objbase.h>
-#include <NuiApi.h> // check for Include Dir: $(KINECTSDK10_DIR)inc;$(KINECT_TOOLKIT_DIR)inc;
+#include <NuiApi.h>				// check for Include Dir: $(KINECTSDK10_DIR)inc;$(KINECT_TOOLKIT_DIR)inc;
 
 #ifdef _WIN32
     #ifdef DLL_EXPORTS
         #define KINECT_API __declspec(dllexport)
     #else
         #define KINECT_API __declspec(dllimport)
-		// to resolve linking add the libra
-		#pragma comment (lib, "KinectWrapper.lib") // add path to lib additional dependency dir $(TargetDir)
+		#pragma comment (lib, "KinectWrapper.lib") // be sure to add the .dll/.lib folder to your Linker path
     #endif // DLL_EXPORTS
 #endif //_WIN32
 
 typedef HANDLE HKINECT;
 #define KINECT_MAX_PORTID_LENGTH	250
 
+// statuses that the KinectSensor wrapper uses to determine state
 typedef enum _KinectSensorStatus
 {
-    /// <summary>
-    /// Chooser has not been started or it has been stopped
-    /// </summary>
     KinectSensorStatusNone = 0x00000000,
 
     /// <summary>
@@ -40,17 +37,19 @@ typedef enum _KinectSensorStatus
 
     /// <summary>
     /// There is not enough bandwidth on the USB controller available
-    /// for this sensor.
+    /// for this sensor. Can recover in some cases
     /// </summary>
     KinectSensorStatusInsufficientBandwidth = 0x00000004,
 
     /// <summary>
-    /// Available sensor is in use by another application
+    /// Available sensor is in use by another application.
+	/// Will recover once the other application releases its sensor
     /// </summary>
     KinectSensorStatusConflict = 0x00000008,
 
     /// <summary>
     /// Don't have a sensor yet, a sensor is initializing, you may not get it
+	/// Can't trust the state of the sensor yet
     /// </summary>
     KinectSensorStatusInitializing = 0x00000010,
 
@@ -65,19 +64,15 @@ typedef enum _KinectSensorStatus
     KinectSensorStatusNotSupported = 0x00000040,
 
     /// <summary>
-    /// There are no sensors available on the system.  If one shows up
-    /// we will try to use it automatically.
-    /// </summary>
-    KinectSensorStatusNoAvailableSensors = 0x00000080,
-
-    /// <summary>
     /// Available sensor has an error
     /// </summary>
-    KinectSensorStatusError = 0x00000100,
+    KinectSensorStatusError = 0x00000080,
 } KINECT_SENSOR_STATUS;
 
+// Structure for the frame data for depth/color
+// take note of cbBytesPerPixel 
 typedef struct _KinectImageFrameFormat
-{   // to confirm the type of frame we are getting
+{   
 	DWORD dwStructSize;
 	DWORD dwHeight;
 	DWORD dwWidth;
@@ -116,10 +111,10 @@ extern "C"
 	KINECT_API HKINECT APIENTRY KinectOpenSensor( _In_z_ const WCHAR* wcPortID );
 
 	// close down resources for the sensor
-	// will not delete until the app is shutdown
+	// handle will still be valid, but you will have to call "Open" again
 	KINECT_API void APIENTRY KinectCloseSensor( _In_ HKINECT hKinect );
 
-	// Sensor properties
+	// Sensor properties, gets the connection id the senosr is using
 	KINECT_API const WCHAR* APIENTRY KinectGetPortID( _In_ HKINECT hKinect );
 	// Get the NUI_ status value from the Sensor
 	KINECT_API HRESULT APIENTRY KinectGetNUISensorStatus( _In_ HKINECT hKinect );
@@ -152,15 +147,8 @@ extern "C"
 	// depth frame 
 	KINECT_API HRESULT APIENTRY KinectGetDepthFrameFormat( _In_ HKINECT hKinect, _Inout_ KINECT_IMAGE_FRAME_FORMAT* pFrame );
 	KINECT_API HRESULT APIENTRY KinectGetDepthFrame( _In_ HKINECT hKinect, ULONG cbBufferSize, _Out_cap_(cbBufferSize) BYTE* pDepthBuffer, _Out_opt_ LONGLONG* liTimeStamp );
-	KINECT_API HRESULT APIENTRY KinectGetDepthFrameAlignedToColor( _In_ HKINECT hKinect, ULONG cbBufferSize, _Out_cap_(cbBufferSize) BYTE* pDepthBuffer, _Out_opt_ LONGLONG* liTimeStamp );
 
 	// skeletal frame
-	KINECT_API HRESULT APIENTRY KinectGetSkeletonData( _In_ HKINECT hKinect, _Out_ NUI_SKELETON_FRAME* pSkeletons );
-	KINECT_API HRESULT APIENTRY KinectGetSkeletonDataAlignedToColor( _In_ HKINECT hKinect, _Out_ NUI_SKELETON_FRAME* pSkeletons );
-
-	// TODO: not implemented yet
-	KINECT_API HRESULT APIENTRY KinectGetAudioBeamAngle( _In_ HKINECT hKinect, _Out_ DOUBLE* angle );
-	KINECT_API HRESULT APIENTRY KinectSetAudioBeamAngle( _In_ HKINECT hKinect, DOUBLE angle );
-	KINECT_API HRESULT APIENTRY KinectGetAudioPosition( _In_ HKINECT hKinect, _Out_ DOUBLE* angle, _Out_ DOUBLE* confidence );
+	KINECT_API HRESULT APIENTRY KinectGetSkeletonFrame( _In_ HKINECT hKinect, _Out_ NUI_SKELETON_FRAME* pSkeletons );
 };
 

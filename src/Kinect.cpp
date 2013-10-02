@@ -74,7 +74,7 @@ void CALLBACK deviceStatus( long hr, const WCHAR *instanceName, const WCHAR *dev
 	if ( SUCCEEDED( hr ) ) {
 		device->start( device->getDeviceOptions() );
 	} else {
-		device->error( hr );
+		device->errorNui( hr );
 		reinterpret_cast<Device*>( data )->stop();
 	}
 }
@@ -133,15 +133,15 @@ JointName Bone::getStartJoint() const
 
 DeviceOptions::DeviceOptions()
 {
-	mDeviceId					= "";
-	mDeviceIndex				= 0;
-	mEnabledColor				= true;
-	mEnabledDepth				= true;
-	mEnabledFrameSync			= false;
-	mEnabledNearMode			= false;
-	mEnabledSeatedMode			= false;
-	mEnabledSkeletonTracking	= true;
-	mEnabledUserTracking		= true;
+	mDeviceId				= "";
+	mDeviceIndex			= 0;
+	mEnabledColor			= true;
+	mEnabledDepth			= true;
+	mEnabledNearMode		= false;
+	mEnabledSeatedMode		= false;
+	mEnabledUserTracking	= true;
+	mSkeletonTransform		= SkeletonTransform::TRANSFORM_DEFAULT;
+	mSkeletonSelectionMode	= SkeletonSelectionMode::SkeletonSelectionModeDefault;
 	setColorResolution( ImageResolution::NUI_IMAGE_RESOLUTION_640x480 );
 	setDepthResolution( ImageResolution::NUI_IMAGE_RESOLUTION_320x240 );
 }
@@ -152,22 +152,9 @@ DeviceOptions& DeviceOptions::enableDepth( bool enable )
 	return *this;
 }
 
-DeviceOptions& DeviceOptions::enableFrameSync( bool enable )
-{
-	mEnabledFrameSync = enable;
-	return *this;
-}
-
 DeviceOptions& DeviceOptions::enableNearMode( bool enable )
 {
 	mEnabledNearMode = enable;
-	return *this;
-}
-
-DeviceOptions& DeviceOptions::enableSkeletonTracking( bool enable, bool seatedMode )
-{
-	mEnabledSeatedMode			= seatedMode;
-	mEnabledSkeletonTracking	= enable;
 	return *this;
 }
 
@@ -213,14 +200,19 @@ int32_t DeviceOptions::getDeviceIndex() const
 	return mDeviceIndex;
 }
 
+SkeletonSelectionMode DeviceOptions::getSkeletonSelectionMode() const
+{
+	return mSkeletonSelectionMode;
+}
+
+SkeletonTransform DeviceOptions::getSkeletonTransform() const
+{
+	return mSkeletonTransform;
+}
+
 bool DeviceOptions::isDepthEnabled() const
 {
 	return mEnabledDepth;
-}
-
-bool DeviceOptions::isFrameSyncEnabled() const
-{
-	return mEnabledFrameSync;
 }
 	
 bool DeviceOptions::isNearModeEnabled() const
@@ -233,11 +225,6 @@ bool DeviceOptions::isSeatedModeEnabled() const
 	return mEnabledSeatedMode;
 }
 
-bool DeviceOptions::isSkeletonTrackingEnabled() const
-{
-	return mEnabledSkeletonTracking;
-}
-	
 bool DeviceOptions::isUserTrackingEnabled() const
 {
 	return mEnabledUserTracking;
@@ -273,9 +260,6 @@ DeviceOptions& DeviceOptions::setDepthResolution( const ImageResolution& resolut
 	switch ( mDepthResolution ) {
 	case ImageResolution::NUI_IMAGE_RESOLUTION_640x480:
 		mDepthSize					= Vec2i( 640, 480 );
-		mEnabledUserTracking		= false;
-		mEnabledSkeletonTracking	= false;
-		mEnabledSeatedMode			= false;
 		break;
 	case ImageResolution::NUI_IMAGE_RESOLUTION_320x240:
 		mDepthSize = Vec2i( 320, 240 );
@@ -304,15 +288,28 @@ DeviceOptions& DeviceOptions::setDeviceIndex( int32_t index )
 	return *this;
 }
 
+DeviceOptions& DeviceOptions::setSkeletonSelectionMode( SkeletonSelectionMode mode )
+{
+	mSkeletonSelectionMode = mode;
+	return *this;
+}
+
+DeviceOptions& DeviceOptions::setSkeletonTransform( SkeletonTransform transform )
+{
+	mSkeletonTransform = transform;
+	return *this;
+}
+
 //////////////////////////////////////////////////////////////////////////////////////////////
 
 Frame::Frame()
-	: mId( 0 )
+	: mDeviceId( "" ), mFrameId( 0 )
 {
 }
 
-Frame::Frame( long id, const Surface8u& color, const Surface16u& depth, const vector<Skeleton>& skeletons )
-	: mColorSurface( color ), mDepthSurface( depth ), mId( id ), mSkeletons( skeletons )
+Frame::Frame( long long frameId, const std::string& deviceId, 
+		const ci::Surface8u& color, const ci::Channel16u& depth, const std::vector<Skeleton>& skeletons )
+	: mColorSurface( color ), mDepthChannel( depth ), mDeviceId( deviceId ), mFrameId( frameId ), mSkeletons( skeletons )
 {
 }
 
@@ -321,36 +318,24 @@ const Surface8u& Frame::getColorSurface() const
 	return mColorSurface;
 }
 
-const Surface16u& Frame::getDepthSurface() const
+const Channel16u& Frame::getDepthChannel() const
 {
-	return mDepthSurface;
+	return mDepthChannel;
 }
 
-long Frame::getId() const
+const std::string& Frame::getDeviceId() const
 {
-	return mId;
+	return mDeviceId;
+}
+
+long long Frame::getFrameId() const
+{
+	return mFrameId;
 }
 
 const vector<Skeleton>&	Frame::getSkeletons() const
 {
 	return mSkeletons;
-}
-
-//////////////////////////////////////////////////////////////////////////////////////////////
-
-Device::ColorFrame::ColorFrame( const ci::Surface8u& surface, __int64 timeStamp )
-: mSurface( surface ), mTimeStamp( timeStamp )
-{
-}
-
-const Surface8u& Device::ColorFrame::getSurface() const
-{
-	return mSurface;
-}
-
-__int64 Device::ColorFrame::getTimeStamp() const
-{
-	return mTimeStamp;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -390,27 +375,22 @@ Device::Device()
 	for ( int32_t i = 0; i < NUI_SKELETON_COUNT; ++i ) {
 		mSkeletons.push_back( Skeleton() );
 	}
-
 	App::get()->getSignalUpdate().connect( bind( &Device::update, this ) );
 }
 
 Device::~Device()
 {
-	mEventHandler = nullptr;
-
 	stop();
-	if ( mSensor != 0 ) {
-		mSensor->NuiShutdown();
-		if ( mSensor ) {
-			mSensor->Release();
-			mSensor = 0;
-			mDepthStreamHandle = 0;
-			mColorStreamHandle = 0;
+	if ( mNuiSensor != 0 ) {
+		mNuiSensor->NuiShutdown();
+		if ( mNuiSensor ) {
+			mNuiSensor->Release();
+			mNuiSensor = 0;
 		}
 	}
 }
 
-void Device::connectEventHandler( const function<void ( Frame, const DeviceOptions& )>& eventHandler )
+void Device::connectEventHandler( const function<void ( Frame )>& eventHandler )
 {
 	mEventHandler = eventHandler;
 }
@@ -424,8 +404,8 @@ void Device::deactivateUsers()
 
 void Device::enableBinaryMode( bool enable, bool invertImage )
 {
-	mBinary = enable;
-	mInverted = invertImage;
+	mBinary		= enable;
+	mInverted	= invertImage;
 }
 
 void Device::enableUserColor( bool enable )
@@ -438,7 +418,7 @@ void Device::enableVerbose( bool enable )
 	mVerbose = enable;
 }
 
-void Device::error( long hr ) {
+void Device::errorNui( long hr ) {
 	if ( !mVerbose ) {
 		return;
 	}
@@ -490,15 +470,19 @@ Vec2i Device::getColorDepthPos( const ci::Vec2i& v )
 {
 	long x;
 	long y;
-	mSensor->NuiImageGetColorPixelCoordinatesFromDepthPixelAtResolution( mDeviceOptions.getColorResolution(), mDeviceOptions.getDepthResolution(), 0, v.x, v.y, mDepthSurface.getPixel( v ).r, &x, &y ); 
+	mNuiSensor->NuiImageGetColorPixelCoordinatesFromDepthPixelAtResolution( 
+		mDeviceOptions.getColorResolution(), 
+		mDeviceOptions.getDepthResolution(), 
+		0, v.x, v.y, 
+		mChannelDepth.getValue( v ), &x, &y ); 
 	return Vec2i( (int32_t)x, (int32_t)y );
 }
 
 float Device::getDepthAt( const ci::Vec2i& pos ) const
 {
 	float depthNorm		= 0.0f;
-	if ( mDepthSurface ) {
-		uint16_t depth	= 0x10000 - mDepthSurface.getPixel( pos ).r;
+	if ( mChannelDepth ) {
+		uint16_t depth	= 0x10000 - mChannelDepth.getValue( pos );
 		depth			= depth << 2;
 		depthNorm		= 1.0f - (float)depth / 65535.0f;
 	}
@@ -517,15 +501,12 @@ const DeviceOptions& Device::getDeviceOptions() const
 	return mDeviceOptions;
 }
 
-float Device::getFrameRate() const 
-{
-	return mFrameRate;
-}
-
 Quatf Device::getOrientation() const
 {
 	Vector4 v;
-	mSensor->NuiAccelerometerGetCurrentReading( &v );
+	if ( mNuiSensor != 0 ) {
+		mNuiSensor->NuiAccelerometerGetCurrentReading( &v );
+	}
 	return toQuatf( v );
 }
 
@@ -558,19 +539,14 @@ Vec2i Device::getSkeletonColorPos( const ci::Vec3f& position )
 int32_t Device::getTilt()
 {
 	long degrees = 0L;
-	if ( mCapture && mSensor != 0 ) {
-		long hr = mSensor->NuiCameraElevationGetAngle( &degrees );
+	if ( mCapture && mNuiSensor != 0 ) {
+		long hr = mNuiSensor->NuiCameraElevationGetAngle( &degrees );
 		if ( FAILED( hr ) ) {
 			console() << "Unable to retrieve device angle:" << endl;
-			error( hr );
+			errorNui( hr );
 		}
 	}
 	return (int32_t)degrees;
-}
-
-int_fast8_t Device::getTransform() const
-{
-	return mTransform;
 }
 
 int32_t Device::getUserCount()
@@ -580,36 +556,35 @@ int32_t Device::getUserCount()
 
 void Device::init( bool reset )
 {
-	// Only set these when first initializing the device
 	if ( !reset ) {
 		mBinary				= false;
+		mEventHandler		= nullptr;
 		mFlipped			= false;
 		mGreyScale			= false;
 		mInverted			= false;
 		mRemoveBackground	= false;
-		mTransform			= TRANSFORM_DEFAULT;
 		mVerbose			= true;
 	}
 
+	mBufferColor			= nullptr;
+	mBufferDepth			= nullptr;
 	mCapture				= false;
-	mColorEvent				= 0;
-	mColorStreamHandle		= 0;
-	mDepthStreamHandle		= 0;
-	mDepthEvent				= 0;
-	mEventHandler			= nullptr;
 	mFrameId				= 0;
-	mFrameRate				= 0.0f;
-	mNewColorSurface		= false;
-	mNewDepthSurface		= false;
-	mNewSkeletons			= false;
+	mKinect					= nullptr;
+	mNuiSensor				= 0;
 	mIsSkeletonDevice		= false;
-	mReadTime				= 0.0;
-	mRgbColor				= 0;
-	mRgbDepth				= 0;
-	mSensor					= 0;
-	mSkeletonEvent			= 0;
 	mTiltRequestTime		= 0.0;
 	mUserCount				= 0;
+
+	if ( mChannelDepth ) {
+		mChannelDepth.reset();
+	}
+	if ( mSurfaceColor ) {
+		mSurfaceColor.reset();
+	}
+	for ( vector<Skeleton>::iterator iter = mSkeletons.begin(); iter != mSkeletons.end(); ++iter ) {
+		iter->clear();
+	}
 	
 	deactivateUsers();
 }
@@ -624,242 +599,9 @@ bool Device::isFlipped() const
 	return mFlipped; 
 }
 
-long Device::openColorStream()
-{
-	if ( mSensor != 0 ) {
-		long hr = mSensor->NuiImageStreamOpen( NUI_IMAGE_TYPE_COLOR, mDeviceOptions.getColorResolution(), 0, 2, mColorEvent, &mColorStreamHandle );
-		if ( FAILED( hr ) ) {
-			console() << "Unable to open color image stream: " << endl;
-			error( hr );
-			stop();
-			return hr;
-		}
-	}
-	return S_OK;
-}
-
-long Device::openDepthStream()
-{
-	if ( mSensor != 0) {
-		NUI_IMAGE_TYPE type = mDeviceOptions.getDepthResolution() != ImageResolution::NUI_IMAGE_RESOLUTION_640x480 && 
-			HasSkeletalEngine( mSensor ) ? NUI_IMAGE_TYPE_DEPTH_AND_PLAYER_INDEX : NUI_IMAGE_TYPE_DEPTH;
-		long hr = mSensor->NuiImageStreamOpen( type, mDeviceOptions.getDepthResolution(), 0, 2, mDepthEvent, &mDepthStreamHandle );
-		if ( FAILED( hr ) ) {
-			console() << "Unable to open depth image stream: " << endl;
-			error( hr );
-			stop();
-			return hr;
-		}
-	}
-	return S_OK;
-}
-
-void Device::pixelToDepthSurface( uint16_t *buffer )
-{
-	int32_t height	= mDepthSurface.getHeight();
-	int32_t width	= mDepthSurface.getWidth();
-	int32_t size	= width * height * 6; // 6 is 3 color channels * sizeof( uint16_t )
-
-	Pixel16u* rgbRun	= mRgbDepth;
-	uint16_t* bufferRun	= buffer;
-
-	if ( mFlipped ) {
-		for ( int32_t y = 0; y < height; ++y ) {
-			for ( int32_t x = 0; x < width; ++x ) {
-				bufferRun		= buffer + ( y * width + ( ( width - x ) - 1 ) );
-				rgbRun			= mRgbDepth + ( y * width + x );
-				*rgbRun			= shortToPixel( *bufferRun );
-			}
-		}
-	} else {
-		for ( int32_t i = 0; i < width * height; ++i ) {
-			Pixel16u pixel = shortToPixel( *bufferRun );
-			++bufferRun;
-			*rgbRun = pixel;
-			++rgbRun;
-		}
-	}
-
-	memcpy( mDepthSurface.getData(), mRgbDepth, size );
-}
-
-void Device::pixelToColorSurface( uint8_t *buffer )
-{
-	int32_t height	= mColorSurface.getHeight();
-	int32_t width	= mColorSurface.getWidth();
-	int32_t size	= width * height * 4;
-	
-	if ( mFlipped ) {
-		uint8_t *flipped = new uint8_t[ size ];
-		for ( int32_t y = 0; y < height; ++y ) {
-			for ( int32_t x = 0; x < width; ++x ) {
-				int32_t dest	= ( y * width + x ) * 4;
-				int32_t src		= ( y * width + ( ( width - x ) - 1 ) ) * 4;
-				for ( int32_t i = 0; i < 4; ++i ) {
-					flipped[ dest + i ] = buffer[ src + i ];
-				}
-			}
-		}
-		memcpy( mColorSurface.getData(), flipped, size );
-		delete [] flipped;
-	} else {
-		memcpy( mColorSurface.getData(), buffer, size );
-	}
-}
-
 void Device::removeBackground( bool remove )
 {
 	mRemoveBackground = remove;
-}
-
-void Device::run()
-{
-	HANDLE events[ 4 ];
-    events[ 0 ] = mColorEvent;
-    events[ 1 ] = mDepthEvent;
-    events[ 2 ] = mSkeletonEvent;
-
-	while ( mCapture ) {
-		if ( mSensor != 0 ) {
-			double time = getElapsedSeconds();
-
-			WaitForMultipleObjects( sizeof( events ) / sizeof( events[ 0 ]), events, 0, WAIT_TIME );
-
-			const NUI_IMAGE_FRAME* frameColor	= 0;
-			const NUI_IMAGE_FRAME* frameDepth	= 0;
-			NUI_SKELETON_FRAME frameSkeleton	= { 0 };
-
-			bool readColor		= !mNewColorSurface;
-			bool readDepth		= !mNewDepthSurface;
-			bool readSkeleton	= !mNewSkeletons;
-			if ( mDeviceOptions.isFrameSyncEnabled() && mDeviceOptions.isColorEnabled() && mDeviceOptions.isDepthEnabled() ) {
-				if ( readColor != readDepth ) {
-					readColor	= false;
-					readDepth	= false;
-				}
-				readSkeleton	= readDepth;
-			}
-			readColor		= readColor && mDeviceOptions.isColorEnabled();
-			readDepth		= readDepth && mDeviceOptions.isDepthEnabled();
-			readSkeleton	= readSkeleton && mDeviceOptions.isSkeletonTrackingEnabled();
-
-			//////////////////////////////////////////////////////////////////////////////////////////////
-
-			if ( readDepth && WAIT_OBJECT_0 == WaitForSingleObject( mDepthEvent, 0 ) ) {
-				if ( SUCCEEDED( NuiImageStreamGetNextFrame( mDepthStreamHandle, 0, &frameDepth ) ) && 
-					frameDepth != 0 && frameDepth->pFrameTexture != 0 ) {
-					mDepthTimeStamp				= frameDepth->liTimeStamp.QuadPart;
-					INuiFrameTexture* texture	= frameDepth->pFrameTexture;
-					_NUI_LOCKED_RECT lockedRect;
-					long hr = texture->LockRect( 0, &lockedRect, 0, 0 );
-					if ( FAILED( hr ) ) {
-						error( hr );
-					}
-					if ( lockedRect.Pitch == 0 ) {
-						console() << "Invalid buffer length received" << endl;
-					} else {
-						pixelToDepthSurface( (uint16_t*)lockedRect.pBits );
-					}
-
-					hr = NuiImageStreamReleaseFrame( mDepthStreamHandle, frameDepth );
-					if ( FAILED( hr ) ) {
-						error( hr ); 
-					}
-					
-					mUserCount = 0;
-					for ( uint32_t i = 0; i < NUI_SKELETON_COUNT; ++i ) {
-						if ( mActiveUsers[ i ] ) {
-							++mUserCount;
-						}
-					}
-					mNewDepthSurface = true;
-				}
-			}
-
-			//////////////////////////////////////////////////////////////////////////////////////////////
-				
-			if ( readColor && WAIT_OBJECT_0 == WaitForSingleObject( mColorEvent, 0 ) ) {
-				if ( SUCCEEDED( NuiImageStreamGetNextFrame( mColorStreamHandle, 0, &frameColor ) ) && 
-					frameColor != 0 && frameColor->pFrameTexture != 0 ) {
-					INuiFrameTexture* texture = frameColor->pFrameTexture;
-					_NUI_LOCKED_RECT lockedRect;
-					long hr = texture->LockRect( 0, &lockedRect, 0, 0 );
-					if ( FAILED( hr ) ) {
-						error( hr );
-					}
-					if ( lockedRect.Pitch != 0 ) {
-						pixelToColorSurface( (uint8_t*)lockedRect.pBits );
-						if ( mDeviceOptions.isFrameSyncEnabled() ) {
-							mColorFrames.push_back( ColorFrame( mColorSurface, frameColor->liTimeStamp.QuadPart ) );
-							if ( mColorFrames.size() > 10 ) {
-								mColorFrames.erase( mColorFrames.begin() );
-							}
-						}
-
-					} else {
-						console() << "Invalid buffer length received." << endl;
-					}
-
-					hr = NuiImageStreamReleaseFrame( mColorStreamHandle, frameColor );
-					if ( FAILED( hr ) ) {
-						error( hr );
-					}
-					mNewColorSurface = true;
-				}
-			}
-
-			//////////////////////////////////////////////////////////////////////////////////////////////
-
-			if ( readSkeleton && WAIT_OBJECT_0 == WaitForSingleObject( mSkeletonEvent, 0 ) ) {
-				long hr = NuiSkeletonGetNextFrame( 0, &frameSkeleton );
-				if ( SUCCEEDED( hr ) ) {
-					bool foundSkeleton = false;
-					for ( int32_t i = 0; i < NUI_SKELETON_COUNT; ++i ) {
-
-						mSkeletons.at( i ).clear();
-
-						NUI_SKELETON_TRACKING_STATE trackingState = frameSkeleton.SkeletonData[ i ].eTrackingState;
-						if ( trackingState == NUI_SKELETON_TRACKED || trackingState == NUI_SKELETON_POSITION_ONLY ) {
-
-							if ( !foundSkeleton ) {
-								_NUI_TRANSFORM_SMOOTH_PARAMETERS transform = kTransformParams[ mTransform ];
-								hr = mSensor->NuiTransformSmooth( &frameSkeleton, &transform );
-								if ( FAILED( hr ) ) {
-									error( hr );
-								}
-								foundSkeleton = true;
-							}
-
-							if ( mFlipped ) {
-								( frameSkeleton.SkeletonData + i )->Position.x *= -1.0f;
-								for ( int32_t j = 0; j < (int32_t)NUI_SKELETON_POSITION_COUNT; ++j ) {
-									( frameSkeleton.SkeletonData + i )->SkeletonPositions[ j ].x *= -1.0f;
-								}
-							}
-
-							_NUI_SKELETON_BONE_ORIENTATION bones[ NUI_SKELETON_POSITION_COUNT ];
-							hr = NuiSkeletonCalculateBoneOrientations( frameSkeleton.SkeletonData + i, bones );
-							if ( FAILED( hr ) ) {
-								error( hr );
-							}
-
-							for ( int32_t j = 0; j < (int32_t)NUI_SKELETON_POSITION_COUNT; ++j ) {
-								Bone bone( *( ( frameSkeleton.SkeletonData + i )->SkeletonPositions + j ), *( bones + j ) );
-								( mSkeletons.begin() + i )->insert( std::pair<JointName, Bone>( (JointName)j, bone ) );
-							}
-
-						}
-
-					}
-					mNewSkeletons = true;
-				}
-
-				mFrameRate	= (float)( 1.0 / ( time - mReadTime ) );
-				mReadTime	= time;
-			}
-		}
-	}
-	return;
 }
 
 void Device::setFlipped( bool flipped ) 
@@ -870,233 +612,103 @@ void Device::setFlipped( bool flipped )
 void Device::setTilt( int32_t degrees )
 {
 	double elapsedSeconds = getElapsedSeconds();
-	if ( mCapture && mSensor != 0 && elapsedSeconds - mTiltRequestTime > kTiltRequestInterval ) {
-		long hr = mSensor->NuiCameraElevationSetAngle( (long)math<int32_t>::clamp( degrees, -MAXIMUM_TILT_ANGLE, MAXIMUM_TILT_ANGLE ) );
+	if ( mCapture && mNuiSensor != 0 && elapsedSeconds - mTiltRequestTime > kTiltRequestInterval ) {
+		long hr = mNuiSensor->NuiCameraElevationSetAngle( (long)math<int32_t>::clamp( degrees, -MAXIMUM_TILT_ANGLE, MAXIMUM_TILT_ANGLE ) );
 		if ( FAILED( hr ) ) {
 			console() << "Unable to change device angle: " << endl;
-			error( hr );
+			errorNui( hr );
 		}
 		mTiltRequestTime = elapsedSeconds;
 	}
 }
 
-void Device::setTransform( int_fast8_t transform )
-{
-	mTransform = transform;
-}
-
-Device::Pixel16u Device::shortToPixel( uint16_t value )
-{
-	uint16_t depth	= 0xFFFF - 0x10000 * ( ( value&  0xFFF8 ) >> 3 ) / 0x0FFF;
-	uint16_t user	= value&  7;
-
-	Pixel16u pixel;
-	pixel.b = 0;
-	pixel.g = 0;
-	pixel.r = 0;
-
-	if ( user > 0 && user < 7 ) {
-		mActiveUsers[ user - 1 ] = true;
-	}
-
-	if ( mBinary ) {
-		uint16_t backgroundColor	= mInverted ? 0xFFFF : 0;
-		uint16_t userColor			= mInverted ? 0 : 0xFFFF;
-
-		if ( user == 0 || user == 7 ) {
-			pixel.r = pixel.g = pixel.b = mRemoveBackground ? backgroundColor : userColor;
-		} else {
-			pixel.r = pixel.g = pixel.b = userColor;
-		}
-	} else if ( mGreyScale ) {
-		if ( user == 0 || user == 7 ) {
-			pixel.r = mRemoveBackground ? 0 : depth;
-		} else {
-			pixel.r = depth;
-		}
-		pixel.g = pixel.r;
-		pixel.b = pixel.g;
-	} else {
-		switch ( user ) {
-		case 0:
-			if ( !mRemoveBackground ) {
-				pixel.r = depth / 4;
-				pixel.g = pixel.r;
-				pixel.b = pixel.g;
-			}
-			break;
-		case 1:
-			pixel.r = depth;
-			break;
-		case 2:
-			pixel.r = depth;
-			pixel.g = depth;
-			break;
-		case 3:
-			pixel.r = depth;
-			pixel.b = depth;
-			break;
-		case 4:
-			pixel.r = depth;
-			pixel.g = depth / 2;
-			break;
-		case 5:
-			pixel.r = depth;
-			pixel.b = depth / 2;
-			break;
-		case 6:
-			pixel.r = depth;
-			pixel.g = depth / 2;
-			pixel.b = pixel.g;
-			break;
-		case 7:
-			if ( !mRemoveBackground ) {
-				pixel.r = 0xFFFF - ( depth / 2 );
-				pixel.g = pixel.r;
-				pixel.b = pixel.g;
-			}
-		}
-	}
-	pixel.r = 0xFFFF - pixel.r;
-	pixel.g = 0xFFFF - pixel.g;
-	pixel.b = 0xFFFF - pixel.b;
-
-	return pixel;
-}
-
 void Device::start( const DeviceOptions& deviceOptions ) 
 {
 	if ( !mCapture ) {
+		long hr = S_OK;
+		
 		mDeviceOptions	= deviceOptions;
 		string deviceId	= mDeviceOptions.getDeviceId();
 		int32_t index	= mDeviceOptions.getDeviceIndex();
-
 		if ( index >= 0 ) {
 			index = math<int32_t>::clamp( index, 0, math<int32_t>::max( getDeviceCount() - 1, 0 ) );
 		}
 
-		if ( mColorEvent == 0 ) {
-			mColorEvent = CreateEvent( 0, 1, 0, 0 );
-		}
-		if ( mDepthEvent == 0 ) {
-			mDepthEvent = CreateEvent( 0, 1, 0, 0 );
-		}
-		if ( mSkeletonEvent == 0 ) {
-			mSkeletonEvent = CreateEvent( 0, 1, 0, 0 );
-		}
-
-		long hr = S_OK;
+		wchar_t portId[ KINECT_MAX_PORTID_LENGTH ];
+		size_t count = KinectGetSensorCount();
 		if ( index >= 0 ) {
-			hr = NuiCreateSensorByIndex( index, &mSensor );
-			if ( FAILED( hr ) ) {
-				console() << "Unable to create device instance " + toString( index ) + ": " << endl;
-				error( hr );
-				return;
+			if ( KinectGetPortIDByIndex( index, _countof( portId ), portId ) ) {
+				mKinect = KinectOpenSensor( portId );
+				hr		= NuiCreateSensorById( portId, &mNuiSensor );
+				mDeviceOptions.setDeviceId( wcharToString( portId ) );
 			}
 		} else if ( deviceId.length() > 0 ) {
 			_bstr_t id = deviceId.c_str();
-			hr = NuiCreateSensorById( id, &mSensor );
-			if ( FAILED( hr ) ) {
+			hr = NuiCreateSensorById( id, &mNuiSensor );
+			for ( size_t i = 0; i < count; ++i ) {
+				if ( deviceId == wcharToString( portId ) && KinectGetPortIDByIndex( i, _countof( portId ), portId ) ) {
+					mKinect = KinectOpenSensor( portId );
+					hr		= NuiCreateSensorById( portId, &mNuiSensor );
+					mDeviceOptions.setDeviceIndex( i );
+					break;
+				} 
+			}
+
+		}
+
+		if ( mKinect == nullptr ) {
+			if ( index >= 0 ) {
+				console() << "Unable to create device instance " + toString( index ) + ": " << endl;
+			} else if ( deviceId.length() > 0 ) {
 				console() << "Unable to create device instance " + deviceId + ":" << endl;
-				error( hr );
-				return;
+			} else {
+				console() << "Invalid device name or index." << endl;
 			}
-		} else {
-			console() << "Invalid device name or index." << endl;
+			errorNui( hr );
+			mDeviceOptions.setDeviceIndex( -1 );
+			mDeviceOptions.setDeviceId( "" );
 			return;
 		}
 
-		hr = mSensor != 0 ? mSensor->NuiStatus() : E_NUI_NOTCONNECTED;
-		if ( hr == E_NUI_NOTCONNECTED ) {
-			error( hr );
+		KINECT_SENSOR_STATUS status = KinectGetKinectSensorStatus( mKinect );
+		statusKinect( status );
+
+		if ( status > 1 ) {
 			return;
-		}
-
-		if ( mSensor != 0 ) {
-			mDeviceOptions.setDeviceIndex( mSensor->NuiInstanceIndex() );
-			BSTR id = ::SysAllocString( mSensor->NuiDeviceConnectionId() ); 
-			_bstr_t idStr( id );
-			if ( idStr.length() > 0 ) {
-				std::string str( idStr );
-				deviceId = str;
-			}
-			::SysFreeString( id );
-		} else {
-			index = -1;
-			deviceId = "";
-		}
-
-		mDeviceOptions.setDeviceIndex( index );
-		mDeviceOptions.setDeviceId( deviceId );
-
-		unsigned long flags;
-		if ( !mDeviceOptions.isUserTrackingEnabled() ) {
-			flags = NUI_INITIALIZE_FLAG_USES_DEPTH;
-		} else {
-			flags = NUI_INITIALIZE_FLAG_USES_DEPTH_AND_PLAYER_INDEX;
-			if ( mDeviceOptions.isSkeletonTrackingEnabled() ) {
-				flags |= NUI_INITIALIZE_FLAG_USES_SKELETON;
-				if ( mDeviceOptions.isNearModeEnabled() ) {
-					flags |= NUI_SKELETON_TRACKING_FLAG_ENABLE_IN_NEAR_RANGE;
-				}
-			}
-		}
-		if ( mDeviceOptions.isColorEnabled() ) {
-			flags |= NUI_INITIALIZE_FLAG_USES_COLOR;
-		}
-		hr = mSensor->NuiInitialize( flags );
-		if ( FAILED( hr ) ) {
-			console() << "Unable to initialize device " + mDeviceOptions.getDeviceId() + ":" << endl;
-			error( hr );
-			throw ExcDeviceInit( hr, mDeviceOptions.getDeviceId() );
 		}
 		
-		if ( mDeviceOptions.getColorResolution() != ImageResolution::NUI_IMAGE_RESOLUTION_INVALID ) {
-			const Vec2i& videoSize = mDeviceOptions.getColorSize();
-			if ( mDeviceOptions.isColorEnabled() ) {
-				hr = openColorStream();
-				if ( FAILED( hr ) ) {
-					throw ExcOpenStreamColor( hr );
-				}
+		if ( mDeviceOptions.isColorEnabled() && mDeviceOptions.getColorResolution() != ImageResolution::NUI_IMAGE_RESOLUTION_INVALID ) {
+			KINECT_IMAGE_FRAME_FORMAT format	= { sizeof( KINECT_IMAGE_FRAME_FORMAT ), 0 };
+			mFormatColor						= format;
+			hr = KinectEnableColorStream( mKinect, mDeviceOptions.getColorResolution(), &mFormatColor );
+			if ( SUCCEEDED( hr ) ) {
+				mBufferColor	= new uint8_t[ mFormatColor.cbBufferSize ];
+			} else {
+				console() << "Unable to initialize color stream: ";
+				errorNui( hr );
 			}
-			mColorSurface	= Surface8u( videoSize.x, videoSize.y, false, SurfaceChannelOrder::BGRX );
-			mRgbColor		= new Pixel[ videoSize.x * videoSize.y * 4 ];
 		}
 
-		if ( mDeviceOptions.getDepthResolution() != ImageResolution::NUI_IMAGE_RESOLUTION_INVALID ) {
-			const Vec2i& depthSize = mDeviceOptions.getDepthSize();
-			if ( mDeviceOptions.isDepthEnabled() ) {
-				hr = openDepthStream();
-				if ( FAILED( hr ) ) {
-					throw ExcOpenStreamDepth( hr );
-				}
+		if ( mDeviceOptions.isDepthEnabled() && mDeviceOptions.getDepthResolution() != ImageResolution::NUI_IMAGE_RESOLUTION_INVALID ) {
+			KINECT_IMAGE_FRAME_FORMAT format	= { sizeof( KINECT_IMAGE_FRAME_FORMAT ), 0 };
+			mFormatDepth						= format;
+			hr = KinectEnableDepthStream( mKinect, mDeviceOptions.isNearModeEnabled(), mDeviceOptions.getDepthResolution(), &mFormatDepth );
+			if ( SUCCEEDED( hr ) ) {
+				mBufferDepth	= new uint8_t[ mFormatDepth.cbBufferSize ];
+			} else {
+				console() << "Unable to initialize depth stream: ";
+				errorNui( hr );
 			}
-			mDepthSurface	= Surface16u( depthSize.x, depthSize.y, false, SurfaceChannelOrder::RGB );
-			mRgbDepth		= new Pixel16u[ depthSize.x * depthSize.y * 3 ];
 		}
 
-		if ( mDeviceOptions.isSkeletonTrackingEnabled() && HasSkeletalEngine( mSensor ) ) {
-			flags = NUI_SKELETON_TRACKING_FLAG_ENABLE_IN_NEAR_RANGE;
-			if ( mDeviceOptions.isSeatedModeEnabled() ) {
-				flags |= NUI_SKELETON_TRACKING_FLAG_ENABLE_SEATED_SUPPORT;
+		if ( mDeviceOptions.isUserTrackingEnabled() && HasSkeletalEngine( mNuiSensor ) ) {
+			hr = KinectEnableSkeletalStream( mKinect, mDeviceOptions.isSeatedModeEnabled(), SkeletonSelectionModeDefault, nullptr );
+			if ( SUCCEEDED( hr ) ) {
+				mIsSkeletonDevice = true;
+			} else {
+				console() << "Unable to initialize user tracking: ";
+				errorNui( hr );
 			}
-			hr = mSensor->NuiSkeletonTrackingEnable( mSkeletonEvent, flags );
-			if ( FAILED( hr ) ) {
-				console() << "Unable to initialize skeleton tracking for device " + mDeviceOptions.getDeviceId() + ": " << endl;
-				error( hr );
-				return;
-			}
-			mIsSkeletonDevice = true;
-		}
-
-		flags = NUI_IMAGE_STREAM_FRAME_LIMIT_MAXIMUM;
-		if ( mDeviceOptions.isNearModeEnabled() ) {
-			flags |= NUI_IMAGE_STREAM_FLAG_ENABLE_NEAR_MODE | NUI_IMAGE_STREAM_FLAG_DISTINCT_OVERFLOW_DEPTH_VALUES;
-		}
-		hr = mSensor->NuiImageStreamSetImageFrameFlags( mDepthStreamHandle, flags );
-		if ( FAILED( hr ) ) {
-			console() << "Unable to set image frame flags: " << endl;
-			error( hr );
 		}
 
 		mSkeletons.clear();
@@ -1104,79 +716,140 @@ void Device::start( const DeviceOptions& deviceOptions )
 			mSkeletons.push_back( Skeleton() );
 		}
 
-		// Start threads
 		mCapture = true;
-		mThread = shared_ptr<thread>( new thread( bind( &Device::run, this ) ) );
 	}
+}
+
+void Device::statusKinect( KINECT_SENSOR_STATUS status )
+{
+	if ( !mVerbose ) {
+		return;
+	}
+	switch ( status ) {
+	case KINECT_SENSOR_STATUS::KinectSensorStatusConflict:
+		console() << "Device conflict.";
+		break;
+	case KINECT_SENSOR_STATUS::KinectSensorStatusError:
+		console() << "A sensor error occurred.";
+		break;
+	case KINECT_SENSOR_STATUS::KinectSensorStatusInitializing:
+		console() << "Device initializing.";
+		break;
+	case KINECT_SENSOR_STATUS::KinectSensorStatusInsufficientBandwidth:
+		console() << "Insufficient bandwidth.";
+		break;
+	case  KINECT_SENSOR_STATUS::KinectSensorStatusNotGenuine:
+		console() << "Sensor is not a genuine device.";
+		break;
+	case KINECT_SENSOR_STATUS::KinectSensorStatusNotPowered:
+		console() << "Sensor not powered.";
+		break;
+	case KINECT_SENSOR_STATUS::KinectSensorStatusNotSupported:
+		console() << "Sensor not supported.";
+		break;
+	case KINECT_SENSOR_STATUS::KinectSensorStatusStarted:
+		console() << "Sensor started";
+		break;
+	default:
+		break;
+	}
+	console() << endl;
 }
 
 void Device::stop()
 {
 	mCapture = false;
-	if ( mThread ) {
-		mThread->join();
-		mThread.reset();
+	if ( mBufferDepth != nullptr ) {
+		delete [] mBufferDepth;
 	}
-
-	if ( mColorEvent != 0 ) {
-		CloseHandle( mColorEvent );
-		mColorEvent = 0;
+	if ( mBufferColor != nullptr ) {
+		delete [] mBufferColor;
 	}
-	if ( mDepthEvent != 0 ) {
-		CloseHandle( mDepthEvent );
-		mDepthEvent = 0;
-	}
-	if ( mSkeletonEvent != 0 ) {
-		CloseHandle( mSkeletonEvent );
-		mSkeletonEvent = 0;
-	}
-
-	if ( mRgbDepth != 0 ) {
-		delete [] mRgbDepth;
-	}
-	if ( mRgbColor != 0 ) {
-		delete [] mRgbColor;
-	}
+	KinectCloseSensor( mKinect );
 	init( true );
 }
 
 void Device::update()
 {
-	bool newFrame = true;
-	if ( mDeviceOptions.isColorEnabled() ) {
-		newFrame = newFrame && mNewColorSurface;
+	if ( !KinectAreAllFramesReady( mKinect ) ) {
+		return;
 	}
-	if ( mDeviceOptions.isDepthEnabled() ) {
-		newFrame = newFrame && mNewDepthSurface;
+
+	if ( mSurfaceColor ) {
+		mSurfaceColor.reset();
 	}
-	if ( mDeviceOptions.isSkeletonTrackingEnabled() ) {
-		newFrame = newFrame && mNewSkeletons;
+	if ( mChannelDepth ) {
+		mChannelDepth.reset();
 	}
-	if ( newFrame && mEventHandler != nullptr ) {
-		if ( mDeviceOptions.isFrameSyncEnabled() && mDeviceOptions.isColorEnabled() && mDeviceOptions.isDepthEnabled() ) {
-			list<ColorFrame>::const_iterator colorFrame = mColorFrames.begin();
-			__int64 d0									= math<__int64>::abs( mDepthTimeStamp - colorFrame->getTimeStamp() );
-			for ( list<ColorFrame>::const_iterator iter = mColorFrames.begin(); iter != mColorFrames.end(); ++iter ) {
-				if ( colorFrame != iter ) {
-					__int64 d1 = math<__int64>::abs( mDepthTimeStamp - iter->getTimeStamp() );
-					if ( d0 < d1 ) {
-						d0 = d1;
-						colorFrame = iter;
+
+	long long timestamp;
+	NUI_SKELETON_FRAME skeletonFrame;
+	if ( mDeviceOptions.isColorEnabled() && 
+		KinectIsColorFrameReady( mKinect ) && 
+		SUCCEEDED( KinectGetColorFrame( mKinect, mFormatColor.cbBufferSize, mBufferColor, &timestamp ) ) ) {
+		mSurfaceColor = Surface8u( mBufferColor, 
+			(int32_t)mFormatColor.dwWidth, (int32_t)mFormatColor.dwHeight, 
+			(int32_t)mFormatColor.dwWidth *(int32_t) mFormatColor.cbBytesPerPixel, 
+			SurfaceChannelOrder::BGRX );
+	}
+	if ( mDeviceOptions.isDepthEnabled() && 
+		KinectIsDepthFrameReady( mKinect ) && 
+		SUCCEEDED( KinectGetDepthFrame( mKinect, mFormatDepth.cbBufferSize, mBufferDepth, &timestamp ) ) ) {
+		mChannelDepth = Channel16u( (int32_t)mFormatDepth.dwWidth, (int32_t)mFormatDepth.dwHeight, 
+			(int32_t)mFormatDepth.dwWidth * (int32_t)mFormatColor.cbBytesPerPixel, 1, 
+			reinterpret_cast<uint16_t*>( mBufferDepth ) );
+    }
+	if ( mDeviceOptions.isUserTrackingEnabled() && 
+		KinectIsSkeletonFrameReady( mKinect ) && 
+		SUCCEEDED( KinectGetSkeletonFrame( mKinect, &skeletonFrame ) ) ) {
+
+		for ( int32_t i = 0; i < NUI_SKELETON_COUNT; ++i ) {
+
+			mSkeletons.at( i ).clear();
+
+			NUI_SKELETON_TRACKING_STATE trackingState = skeletonFrame.SkeletonData[ i ].eTrackingState;
+			if ( trackingState == NUI_SKELETON_TRACKED || trackingState == NUI_SKELETON_POSITION_ONLY ) {
+
+				if ( mFlipped ) {
+					( skeletonFrame.SkeletonData + i )->Position.x *= -1.0f;
+					for ( int32_t j = 0; j < (int32_t)NUI_SKELETON_POSITION_COUNT; ++j ) {
+						( skeletonFrame.SkeletonData + i )->SkeletonPositions[ j ].x *= -1.0f;
 					}
 				}
+
+				_NUI_SKELETON_BONE_ORIENTATION bones[ NUI_SKELETON_POSITION_COUNT ];
+				long hr = NuiSkeletonCalculateBoneOrientations( skeletonFrame.SkeletonData + i, bones );
+				if ( FAILED( hr ) ) {
+					errorNui( hr );
+				}
+
+				for ( int32_t j = 0; j < (int32_t)NUI_SKELETON_POSITION_COUNT; ++j ) {
+					Bone bone( *( ( skeletonFrame.SkeletonData + i )->SkeletonPositions + j ), *( bones + j ) );
+					( mSkeletons.begin() + i )->insert( std::pair<JointName, Bone>( (JointName)j, bone ) );
+				}
+
 			}
 
-			Frame frame( mFrameId, colorFrame->getSurface(), mDepthSurface, mSkeletons );
-			mEventHandler( frame, mDeviceOptions );
-		} else {
-			Frame frame( mFrameId, mColorSurface, mDepthSurface, mSkeletons );
-			mEventHandler( frame, mDeviceOptions );
 		}
-		++mFrameId;
 	}
-	mNewColorSurface	= false;
-	mNewDepthSurface	= false;
-	mNewSkeletons		= false;
+
+	Frame frame( mFrameId, mDeviceOptions.getDeviceId(), mSurfaceColor, mChannelDepth, mSkeletons );
+	mEventHandler( frame );
+	++mFrameId;
+
+	return;
+}
+
+string Device::wcharToString( wchar_t* v )
+{
+	string str = "";
+	wchar_t* id = ::SysAllocString( v );
+	_bstr_t idStr( id );
+	if ( idStr.length() > 0 ) {
+		str = string( idStr );
+	}
+	::SysFreeString( id );
+	return str;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////
