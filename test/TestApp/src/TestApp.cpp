@@ -35,25 +35,27 @@
 */
 
 #include "cinder/app/AppBasic.h"
-#include "cinder/Arcball.h"
-#include "cinder/Camera.h"
-#include "cinder/gl/gl.h"
 #include "cinder/gl/Texture.h"
-#include "cinder/ImageIo.h"
-#include "cinder/Utilities.h"
+#include "cinder/params/Params.h"
+#include "FaceTracker.h"
 #include "Kinect.h"
 
 class TestApp : public ci::app::AppBasic 
 {
 public:
-	void 					draw();
-	void 					keyDown( ci::app::KeyEvent event );
-	void 					prepareSettings( ci::app::AppBasic::Settings* settings );
-	void 					shutdown();
-	void 					setup();
+	void 						draw();
+	void 						prepareSettings( ci::app::AppBasic::Settings* settings );
+	void 						setup();
+	void						update();
 private:
-	MsKinect::DeviceRef		mDevice;
-	MsKinect::Frame			mFrame;
+	MsKinect::DeviceRef			mDevice;
+	MsKinect::FaceTracker::Face	mFace;
+	MsKinect::FaceTrackerRef	mFaceTracker;
+	MsKinect::Frame				mFrame;
+	float						mFrameRate;
+	bool						mFullScreen;
+	bool						mFullScreenPrev;
+	ci::params::InterfaceGlRef	mParams;
 };
 
 using namespace ci;
@@ -61,58 +63,111 @@ using namespace ci::app;
 using namespace MsKinect;
 using namespace std;
 
-const Vec2i	kKinectSize( 640, 480 );
-
 void TestApp::draw()
 {
 	gl::setViewport( getWindowBounds() );
 	gl::clear();
 	gl::setMatricesWindow( getWindowSize() );
 
-	if ( mFrame.getColorSurface() ) {
-		gl::TextureRef tex = gl::Texture::create( mFrame.getColorSurface() );
-		gl::draw( tex, tex->getBounds(), Area( 0, ( getWindowHeight() / 4 ) * 1, getWindowWidth() / 2, ( getWindowHeight() / 4 ) * 3 ) );
+	gl::enable( GL_TEXTURE_2D );
+	gl::color( ColorAf::white() );
+	
+	if ( mFrame.getColorSurface() ) {		
+		gl::draw( gl::Texture::create( mFrame.getColorSurface() ) );
 	}
-	if ( mFrame.getDepthChannel() ) {
-		gl::TextureRef tex = gl::Texture::create( mFrame.getDepthChannel() );
-		gl::draw( tex, tex->getBounds(), Area( getWindowWidth() / 2, ( getWindowHeight() / 4 ) * 1, getWindowWidth(), ( getWindowHeight() / 4 ) * 3 ) );
-	}
-}
 
-void TestApp::keyDown( KeyEvent event )
-{
-	switch ( event.getCode() ) {
-	case KeyEvent::KEY_q:
-		quit();
-		break;
-	case KeyEvent::KEY_f:
-		setFullScreen( !isFullScreen() );
-		break;
+	if ( mFrame.getDepthChannel() ) {
+		{
+			gl::TextureRef tex = gl::Texture::create( mFrame.getDepthChannel() );
+			gl::draw( tex, tex->getBounds(), Rectf( tex->getBounds() ) * 0.5f );
+		}
+
+		Surface16u surface = depthChannelToSurface( mFrame.getDepthChannel(), 
+			DepthProcessOptions().enableUserColor().enableRemoveBackground() );
+		{
+			gl::TextureRef tex = gl::Texture::create( surface );
+			gl::pushMatrices();
+			gl::translate( 0, tex->getHeight() / 2 );
+			gl::draw( tex, tex->getBounds(), Rectf( tex->getBounds() ) * 0.5f );
+			gl::popMatrices();
+		}
+	}
+
+	gl::disable( GL_TEXTURE_2D );
+
+	uint32_t i = 0;
+	const vector<Skeleton>& skeletons = mFrame.getSkeletons();
+	for ( vector<Skeleton>::const_iterator skeletonIt = skeletons.begin(); skeletonIt != skeletons.end(); ++skeletonIt, i++ ) {
+		gl::color( mDevice->getUserColor( i ) );
+		for ( Skeleton::const_iterator boneIt = skeletonIt->begin(); boneIt != skeletonIt->end(); ++boneIt ) {
+			const Bone& bone	= boneIt->second;
+			Vec2i v0			= mapSkeletonCoordToColor( 
+				bone.getPosition(), 
+				mFrame.getDepthChannel(), 
+				mDevice->getDeviceOptions().getColorResolution(), 
+				mDevice->getDeviceOptions().getDepthResolution() 
+				);
+			Vec2i v1			= mapSkeletonCoordToColor( 
+				skeletonIt->at( bone.getStartJoint() ).getPosition(), 
+				mFrame.getDepthChannel(), 
+				mDevice->getDeviceOptions().getColorResolution(), 
+				mDevice->getDeviceOptions().getDepthResolution() 
+				);
+			gl::drawLine( v0, v1 );
+			gl::drawSolidCircle( v0, 5.0f, 16 );
+		}
+	}
+
+	if ( mFace.getMesh2d().getNumVertices() > 0 ) {
+		gl::color( ColorAf::white() );
+		gl::enableWireframe();
+		gl::draw( mFace.getMesh2d() );
+		gl::disableWireframe();
 	}
 }
 
 void TestApp::prepareSettings( Settings* settings )
 {
-	settings->setWindowSize( 1024, 768 );
+	settings->setWindowSize( 640, 480 );
 	settings->setFrameRate( 60.0f );
 }
 
 void TestApp::setup()
 {
-	gl::enable( GL_TEXTURE_2D );
-	gl::color( ColorAf::white() );
+	mFrameRate		= 0.0f;
+	mFullScreen		= isFullScreen();
+	mFullScreenPrev	= mFullScreen;
 
 	mDevice = Device::create();
-	mDevice->start( DeviceOptions().enableDepth( true ).enableUserTracking( false ) );
 	mDevice->connectEventHandler( [ & ]( Frame frame )
 	{
 		mFrame = frame;
+		if ( mFaceTracker ) {
+			mFaceTracker->update( mFrame.getColorSurface(), mFrame.getDepthChannel() );
+		}
 	} );
+	mDevice->start( DeviceOptions() );
+
+	mFaceTracker = FaceTracker::create();
+	mFaceTracker->enableCalcMesh( false );
+	mFaceTracker->enableCalcMesh2d();
+	mFaceTracker->connectEventHander( [ & ]( FaceTracker::Face face ) {
+		mFace = face;
+	} );
+	mFaceTracker->start();
+
+	mParams = params::InterfaceGl::create( "PARAMS", Vec2i( 200, 60 ) );
+	mParams->addParam( "Frame rate",	&mFrameRate,					"", true );
+	mParams->addParam( "Full screen",	&mFullScreen,					"key=f" );
+	mParams->addButton( "Quit",			bind( &TestApp::quit, this ),	"key=q" );
 }
 
-void TestApp::shutdown()
+void TestApp::update()
 {
-	mDevice->stop();
+	if ( mFullScreenPrev != mFullScreen ) {
+		setFullScreen( mFullScreen );
+		mFullScreenPrev = mFullScreen;
+	}
 }
 
 CINDER_APP_BASIC( TestApp, RendererGl )

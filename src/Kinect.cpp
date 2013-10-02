@@ -50,7 +50,181 @@ using namespace std;
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 
+DepthProcessOptions::DepthProcessOptions()
+	: mBinary( false ), mBinaryInverted( false ), mRemoveBackground( false ), mUserColor( false )
+{
+}
+
+DepthProcessOptions& DepthProcessOptions::enableBinary( bool enable, bool inverted )
+{
+	mBinary			= enable;
+	mBinaryInverted	= inverted;
+	return *this;
+}
+
+DepthProcessOptions& DepthProcessOptions::enableRemoveBackground( bool enable )
+{
+	mRemoveBackground = enable;
+	return *this;
+}
+
+DepthProcessOptions& DepthProcessOptions::enableUserColor( bool enable )
+{
+	mUserColor = enable;
+	return *this;
+}
+
+bool DepthProcessOptions::isBinaryEnabled() const
+{
+	return mBinary;
+}
+
+bool DepthProcessOptions::isBinaryInverted() const
+{
+	return mBinaryInverted;
+}
+
+bool DepthProcessOptions::isRemoveBackgroundEnabled() const
+{
+	return mRemoveBackground;
+}
+
+bool DepthProcessOptions::isUserColorEnabled() const
+{
+	return mUserColor;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+
 const double kTiltRequestInterval = 1.5;
+
+size_t calcNumUsersFromDepth( const ci::Channel16u& depth )
+{
+	std::map<uint16_t, bool> users;
+	Channel16u::ConstIter iter = depth.getIter();
+	while ( iter.line() ) {
+		while ( iter.pixel() ) {
+			uint16_t v	= iter.v();
+			uint16_t id = v & 7;
+			if ( id > 0 && id < 7 ) {
+				users[ id ] = true;
+			}
+		}
+	}
+	return users.size();
+}
+
+Surface16u depthChannelToSurface( const Channel16u& depth, const DepthProcessOptions& depthProcessOptions )
+{
+	Surface16u surface( depth );
+	Surface16u::Iter iter = surface.getIter();
+	while ( iter.line() ) {
+		while ( iter.pixel() ) {
+			uint16_t v	= 0xFFFF - 0x10000 * ( ( iter.r() & 0xFFF8 ) >> 3 ) / 0x0FFF;
+			uint16_t id = iter.r() & 7;
+
+			struct Pixel
+			{
+				uint16_t r;
+				uint16_t g;
+				uint16_t b;
+			};
+			Pixel pixel;
+			pixel.r = pixel.g = pixel.b = 0;
+
+			if ( depthProcessOptions.isBinaryEnabled() ) {
+				uint16_t backgroundColor	= depthProcessOptions.isBinaryInverted() ? 0xFFFF : 0;
+				uint16_t userColor			= depthProcessOptions.isBinaryInverted() ? 0 : 0xFFFF;
+				if ( id == 0 || id == 7 ) {
+					pixel.r = pixel.g = pixel.b = depthProcessOptions.isRemoveBackgroundEnabled() ? backgroundColor : userColor;
+				} else {
+					pixel.r = pixel.g = pixel.b = userColor;
+				}
+			} else if ( depthProcessOptions.isUserColorEnabled() ) {
+				switch ( id ) {
+				case 0:
+					if ( !depthProcessOptions.isRemoveBackgroundEnabled() ) {
+						pixel.r = pixel.g = pixel.b = v / 4;
+					}
+					break;
+				case 1:
+					pixel.r = v;
+					break;
+				case 2:
+					pixel.r = v;
+					pixel.g = v;
+					break;
+				case 3:
+					pixel.r = v;
+					pixel.b = v;
+					break;
+				case 4:
+					pixel.r = v;
+					pixel.g = v / 2;
+					break;
+				case 5:
+					pixel.r = v;
+					pixel.b = v / 2;
+					break;
+				case 6:
+					pixel.r = v;
+					pixel.b = pixel.g = v / 2;
+					break;
+				case 7:
+					if ( !depthProcessOptions.isRemoveBackgroundEnabled() ) {
+						pixel.r = pixel.g = pixel.b = 0xFFFF - ( v / 2 );
+					}
+				default:
+					break;
+				}
+			}
+			pixel.r = 0xFFFF - pixel.r;
+			pixel.g = 0xFFFF - pixel.g;
+			pixel.b = 0xFFFF - pixel.b;
+			surface.setPixel( iter.getPos(), ColorT<uint16_t>( pixel.r, pixel.g, pixel.b ) );
+		}
+	}
+	return surface;
+}
+
+Vec2i mapColorCoordToDepth( const Vec2i& v, const Channel16u& depth, 
+						   ImageResolution colorResolution, ImageResolution depthResolution )
+{
+	long x;
+	long y;
+	NuiImageGetColorPixelCoordinatesFromDepthPixelAtResolution( 
+		colorResolution, 
+		depthResolution, 
+		0, v.x, v.y, 
+		depth.getValue( v ), &x, &y ); 
+	return Vec2i( (int32_t)x, (int32_t)y );
+}
+
+Vec2i mapSkeletonCoordToColor( const Vec3f& v, const Channel16u& depth, 
+							  ImageResolution colorResolution, ImageResolution depthResolution )
+{
+	Vec2i v2	= mapSkeletonCoordToDepth( v, depthResolution );
+	v2			= mapColorCoordToDepth( v2, depth, colorResolution, depthResolution );
+	return v2;
+}
+
+Vec2i mapSkeletonCoordToDepth( const Vec3f& v, ImageResolution depthResolution )
+{
+	float x;
+	float y;
+	Vector4 pos;
+	pos.x = v.x;
+	pos.y = v.y;
+	pos.z = v.z;
+	pos.w = 1.0f;
+	NuiTransformSkeletonToDepthImage( pos, &x, &y, depthResolution );
+	return Vec2i( (int32_t)x, (int32_t)y );
+}
+
+uint16_t userIdFromDepthCoord( const Channel16u& depth, const Vec2i& v )
+{
+	return ( depth.getValue( v ) & 7 ) % 7;
+}
 
 Matrix44f toMatrix44f( const Matrix4& m ) 
 {
@@ -146,6 +320,12 @@ DeviceOptions::DeviceOptions()
 	setDepthResolution( ImageResolution::NUI_IMAGE_RESOLUTION_320x240 );
 }
 
+DeviceOptions& DeviceOptions::enableColor( bool enable )
+{
+	mEnabledColor = enable;
+	return *this;
+}
+
 DeviceOptions& DeviceOptions::enableDepth( bool enable )
 {
 	mEnabledDepth = enable;
@@ -158,15 +338,15 @@ DeviceOptions& DeviceOptions::enableNearMode( bool enable )
 	return *this;
 }
 
-DeviceOptions& DeviceOptions::enableUserTracking( bool enable )
+DeviceOptions& DeviceOptions::enableSeatedMode( bool enable )
 {
-	mEnabledUserTracking = enable;
+	mEnabledSeatedMode = enable;
 	return *this;
 }
 
-DeviceOptions& DeviceOptions::enableColor( bool enable )
+DeviceOptions& DeviceOptions::enableUserTracking( bool enable )
 {
-	mEnabledColor = enable;
+	mEnabledUserTracking = enable;
 	return *this;
 }
 	
@@ -395,24 +575,6 @@ void Device::connectEventHandler( const function<void ( Frame )>& eventHandler )
 	mEventHandler = eventHandler;
 }
 
-void Device::deactivateUsers()
-{
-	for ( uint32_t i = 0; i < NUI_SKELETON_COUNT; ++i ) {
-		mActiveUsers[ i ] = false;
-	}
-}
-
-void Device::enableBinaryMode( bool enable, bool invertImage )
-{
-	mBinary		= enable;
-	mInverted	= invertImage;
-}
-
-void Device::enableUserColor( bool enable )
-{
-	mGreyScale = !enable;
-}
-
 void Device::enableVerbose( bool enable )
 {
 	mVerbose = enable;
@@ -466,18 +628,6 @@ void Device::errorNui( long hr ) {
 	console() << endl;
 }
 
-Vec2i Device::getColorDepthPos( const ci::Vec2i& v )
-{
-	long x;
-	long y;
-	mNuiSensor->NuiImageGetColorPixelCoordinatesFromDepthPixelAtResolution( 
-		mDeviceOptions.getColorResolution(), 
-		mDeviceOptions.getDepthResolution(), 
-		0, v.x, v.y, 
-		mChannelDepth.getValue( v ), &x, &y ); 
-	return Vec2i( (int32_t)x, (int32_t)y );
-}
-
 float Device::getDepthAt( const ci::Vec2i& pos ) const
 {
 	float depthNorm		= 0.0f;
@@ -510,32 +660,6 @@ Quatf Device::getOrientation() const
 	return toQuatf( v );
 }
 
-Vec2i Device::getSkeletonDepthPos( const ci::Vec3f& position )
-{
-	float x;
-	float y;
-	Vector4 pos;
-	pos.x = position.x;
-	pos.y = position.y;
-	pos.z = position.z;
-	pos.w = 1.0f;
-	NuiTransformSkeletonToDepthImage( pos, &x, &y, mDeviceOptions.getDepthResolution() );
-	return Vec2i( (int32_t)x, (int32_t)y );
-}
-
-Vec2i Device::getSkeletonColorPos( const ci::Vec3f& position )
-{
-	float x;
-	float y;
-	Vector4 pos;
-	pos.x = position.x;
-	pos.y = position.y;
-	pos.z = position.z;
-	pos.w = 1.0f;
-	NuiTransformSkeletonToDepthImage( pos, &x, &y, mDeviceOptions.getColorResolution() );
-	return Vec2i( (int32_t)x, (int32_t)y );
-}
-
 int32_t Device::getTilt()
 {
 	long degrees = 0L;
@@ -549,32 +673,21 @@ int32_t Device::getTilt()
 	return (int32_t)degrees;
 }
 
-int32_t Device::getUserCount()
-{
-	return mDeviceOptions.isDepthEnabled() ? mUserCount : 0;
-}
-
 void Device::init( bool reset )
 {
 	if ( !reset ) {
-		mBinary				= false;
-		mEventHandler		= nullptr;
-		mFlipped			= false;
-		mGreyScale			= false;
-		mInverted			= false;
-		mRemoveBackground	= false;
-		mVerbose			= true;
+		mEventHandler	= nullptr;
+		mVerbose		= true;
 	}
 
-	mBufferColor			= nullptr;
-	mBufferDepth			= nullptr;
-	mCapture				= false;
-	mFrameId				= 0;
-	mKinect					= nullptr;
-	mNuiSensor				= 0;
-	mIsSkeletonDevice		= false;
-	mTiltRequestTime		= 0.0;
-	mUserCount				= 0;
+	mBufferColor		= nullptr;
+	mBufferDepth		= nullptr;
+	mCapture			= false;
+	mFrameId			= 0;
+	mKinect				= nullptr;
+	mNuiSensor			= 0;
+	mIsSkeletonDevice	= false;
+	mTiltRequestTime	= 0.0;
 
 	if ( mChannelDepth ) {
 		mChannelDepth.reset();
@@ -585,28 +698,11 @@ void Device::init( bool reset )
 	for ( vector<Skeleton>::iterator iter = mSkeletons.begin(); iter != mSkeletons.end(); ++iter ) {
 		iter->clear();
 	}
-	
-	deactivateUsers();
 }
 
 bool Device::isCapturing() const 
 {
 	return mCapture; 
-}
-
-bool Device::isFlipped() const 
-{ 
-	return mFlipped; 
-}
-
-void Device::removeBackground( bool remove )
-{
-	mRemoveBackground = remove;
-}
-
-void Device::setFlipped( bool flipped ) 
-{
-	mFlipped = flipped;
 }
 
 void Device::setTilt( int32_t degrees )
@@ -682,8 +778,9 @@ void Device::start( const DeviceOptions& deviceOptions )
 			mFormatColor						= format;
 			hr = KinectEnableColorStream( mKinect, mDeviceOptions.getColorResolution(), &mFormatColor );
 			if ( SUCCEEDED( hr ) ) {
-				mBufferColor	= new uint8_t[ mFormatColor.cbBufferSize ];
+				mBufferColor					= new uint8_t[ mFormatColor.cbBufferSize ];
 			} else {
+				mDeviceOptions.enableColor( false );
 				console() << "Unable to initialize color stream: ";
 				errorNui( hr );
 			}
@@ -694,18 +791,21 @@ void Device::start( const DeviceOptions& deviceOptions )
 			mFormatDepth						= format;
 			hr = KinectEnableDepthStream( mKinect, mDeviceOptions.isNearModeEnabled(), mDeviceOptions.getDepthResolution(), &mFormatDepth );
 			if ( SUCCEEDED( hr ) ) {
-				mBufferDepth	= new uint8_t[ mFormatDepth.cbBufferSize ];
+				mBufferDepth					= new uint8_t[ mFormatDepth.cbBufferSize ];
 			} else {
+				mDeviceOptions.enableDepth( false );
 				console() << "Unable to initialize depth stream: ";
 				errorNui( hr );
 			}
 		}
 
-		if ( mDeviceOptions.isUserTrackingEnabled() && HasSkeletalEngine( mNuiSensor ) ) {
-			hr = KinectEnableSkeletalStream( mKinect, mDeviceOptions.isSeatedModeEnabled(), SkeletonSelectionModeDefault, nullptr );
+		if ( mDeviceOptions.isUserTrackingEnabled() ) {
+			hr = KinectEnableSkeletalStream( mKinect, mDeviceOptions.isSeatedModeEnabled(), 
+				mDeviceOptions.getSkeletonSelectionMode(), &kTransformParams[ mDeviceOptions.getSkeletonTransform() ] );
 			if ( SUCCEEDED( hr ) ) {
 				mIsSkeletonDevice = true;
 			} else {
+				mDeviceOptions.enableUserTracking( false );
 				console() << "Unable to initialize user tracking: ";
 				errorNui( hr );
 			}
@@ -783,9 +883,7 @@ void Device::update()
 	}
 
 	long long timestamp;
-	NUI_SKELETON_FRAME skeletonFrame;
 	if ( mDeviceOptions.isColorEnabled() && 
-		KinectIsColorFrameReady( mKinect ) && 
 		SUCCEEDED( KinectGetColorFrame( mKinect, mFormatColor.cbBufferSize, mBufferColor, &timestamp ) ) ) {
 		mSurfaceColor = Surface8u( mBufferColor, 
 			(int32_t)mFormatColor.dwWidth, (int32_t)mFormatColor.dwHeight, 
@@ -793,30 +891,19 @@ void Device::update()
 			SurfaceChannelOrder::BGRX );
 	}
 	if ( mDeviceOptions.isDepthEnabled() && 
-		KinectIsDepthFrameReady( mKinect ) && 
 		SUCCEEDED( KinectGetDepthFrame( mKinect, mFormatDepth.cbBufferSize, mBufferDepth, &timestamp ) ) ) {
 		mChannelDepth = Channel16u( (int32_t)mFormatDepth.dwWidth, (int32_t)mFormatDepth.dwHeight, 
-			(int32_t)mFormatDepth.dwWidth * (int32_t)mFormatColor.cbBytesPerPixel, 1, 
-			reinterpret_cast<uint16_t*>( mBufferDepth ) );
+			(int32_t)mFormatDepth.dwWidth * (int32_t)mFormatDepth.cbBytesPerPixel, 0, 
+			(uint16_t*)mBufferDepth );
     }
+
+	NUI_SKELETON_FRAME skeletonFrame;
 	if ( mDeviceOptions.isUserTrackingEnabled() && 
-		KinectIsSkeletonFrameReady( mKinect ) && 
 		SUCCEEDED( KinectGetSkeletonFrame( mKinect, &skeletonFrame ) ) ) {
-
 		for ( int32_t i = 0; i < NUI_SKELETON_COUNT; ++i ) {
-
 			mSkeletons.at( i ).clear();
-
 			NUI_SKELETON_TRACKING_STATE trackingState = skeletonFrame.SkeletonData[ i ].eTrackingState;
 			if ( trackingState == NUI_SKELETON_TRACKED || trackingState == NUI_SKELETON_POSITION_ONLY ) {
-
-				if ( mFlipped ) {
-					( skeletonFrame.SkeletonData + i )->Position.x *= -1.0f;
-					for ( int32_t j = 0; j < (int32_t)NUI_SKELETON_POSITION_COUNT; ++j ) {
-						( skeletonFrame.SkeletonData + i )->SkeletonPositions[ j ].x *= -1.0f;
-					}
-				}
-
 				_NUI_SKELETON_BONE_ORIENTATION bones[ NUI_SKELETON_POSITION_COUNT ];
 				long hr = NuiSkeletonCalculateBoneOrientations( skeletonFrame.SkeletonData + i, bones );
 				if ( FAILED( hr ) ) {
@@ -827,9 +914,7 @@ void Device::update()
 					Bone bone( *( ( skeletonFrame.SkeletonData + i )->SkeletonPositions + j ), *( bones + j ) );
 					( mSkeletons.begin() + i )->insert( std::pair<JointName, Bone>( (JointName)j, bone ) );
 				}
-
 			}
-
 		}
 	}
 

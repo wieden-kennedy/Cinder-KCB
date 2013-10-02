@@ -58,11 +58,60 @@
 namespace MsKinect
 {
 class Device;
+class DeviceOptions;
 typedef NUI_SKELETON_BONE_ROTATION		BoneRotation;
 typedef NUI_IMAGE_RESOLUTION			ImageResolution;
 typedef NUI_SKELETON_POSITION_INDEX		JointName;
 typedef KINECT_SKELETON_SELECTION_MODE	SkeletonSelectionMode;
 typedef std::shared_ptr<Device>			DeviceRef;
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+
+class DepthProcessOptions
+{
+public:
+	DepthProcessOptions();
+
+	/*! Enables binary mode where background is black and users 
+		are white. Set \a inverted to true to reverse. */
+	DepthProcessOptions&				enableBinary( bool enable = true, bool inverted = false );
+	//! Sets background to black.
+	DepthProcessOptions&				enableRemoveBackground( bool enable = true );
+	//! Colorizes user pixels.
+	DepthProcessOptions&				enableUserColor( bool enable = true );
+
+	//! Returns true if image is black and white.
+	bool								isBinaryEnabled() const;
+	//! Returns true if black and white image is inverted.
+	bool								isBinaryInverted() const;
+	//! Returns true if background removal is enabled.
+	bool								isRemoveBackgroundEnabled() const;
+	//! Returns true if user colorization is enabled.
+	bool								isUserColorEnabled() const;
+protected:
+	bool								mBinary;
+	bool								mBinaryInverted;
+	bool								mRemoveBackground;
+	bool								mUserColor;
+};
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+
+//! Counts the number of users in \a depth.
+size_t									calcNumUsersFromDepth( const ci::Channel16u& depth );
+//! Creates a surface with colorized users from \a depth.
+ci::Surface16u							depthChannelToSurface( const ci::Channel16u& depth, 
+															  const DepthProcessOptions& depthProcessOptions = DepthProcessOptions() );
+//! Returns pixel location of color position in depth image.
+ci::Vec2i								mapColorCoordToDepth( const ci::Vec2i& v, const ci::Channel16u& depth, 
+															 ImageResolution colorResolution, ImageResolution depthResolution );
+//! Returns pixel location of skeleton position in color image. Requires depth resolution.s
+ci::Vec2i								mapSkeletonCoordToColor( const ci::Vec3f& v, const ci::Channel16u& depth, 
+																ImageResolution colorResolution, ImageResolution depthResolution );
+//! Returns pixel location of skeleton position in depth image.
+ci::Vec2i								mapSkeletonCoordToDepth( const ci::Vec3f& v, ImageResolution depthResolution );
+//! Returns user ID for pixel at \a coord in \a depth. 0 is no user.
+uint16_t								userIdFromDepthCoord( const ci::Channel16u& depth, const ci::Vec2i& v );
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -270,14 +319,6 @@ public:
 	//! Returns true if input is flipped.
 	bool								isFlipped() const;
 
-	//! Returns pixel location of skeleton position in depth image.
-	ci::Vec2i							getSkeletonDepthPos( const ci::Vec3f& v );
-	//! Returns pixel location of skeleton position in color image.
-	ci::Vec2i							getSkeletonColorPos( const ci::Vec3f& v );
-
-	//! Returns pixel location of color position in depth image.
-	ci::Vec2i							getColorDepthPos( const ci::Vec2i& v );
-
 	//! Sets device angle to \a degrees. Default is 0.
 	void								setTilt( int32_t degrees = 0 );
 
@@ -316,20 +357,11 @@ protected:
 	std::vector<Skeleton>				mSkeletons;
 	ci::Surface8u						mSurfaceColor;
 	
-	double								mTiltRequestTime;
-	
-	bool								mBinary;
 	bool								mCapture;
-	bool								mFlipped;
-	bool								mGreyScale;
-	bool								mInverted;
 	bool								mIsSkeletonDevice;
-	bool								mRemoveBackground;
 	bool								mVerbose;
 
-	void								deactivateUsers();
-	volatile int32_t					mUserCount;
-	bool								mActiveUsers[ NUI_SKELETON_COUNT ];
+	double								mTiltRequestTime;
 	
 	void								errorNui( long hr );
 	void								statusKinect( KINECT_SENSOR_STATUS status );

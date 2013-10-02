@@ -274,7 +274,6 @@ void FaceTracker::run()
 {
 	while ( mRunning ) {
 		if ( !mNewFace ) {
-
 			long hr = S_OK;
 
 			mFace.mAnimationUnits.clear();
@@ -294,10 +293,8 @@ void FaceTracker::run()
 
 			if ( mSuccess ) {
 				hr = mFaceTracker->ContinueTracking( &mSensorData, hint, mResult );
-				console() << "Continue ";
 			} else {
 				hr = mFaceTracker->StartTracking( &mSensorData, 0, hint, mResult );
-				console() << "Start ";
 			}
 
 			if ( hint != 0 ) {
@@ -305,13 +302,6 @@ void FaceTracker::run()
 			}
 
 			mSuccess = SUCCEEDED( hr ) && SUCCEEDED( mResult->GetStatus() );
-
-			if ( mSuccess ) {
-				console() << "succeeded";
-			} else {
-				console() << "failed";
-			}
-			console() << endl;
 		
 			if ( mSuccess ) {
 				hr = mFaceTracker->GetFaceModel( &mModel );
@@ -408,7 +398,7 @@ void FaceTracker::run()
 	}
 }
 
-void FaceTracker::connectEventHander( const EventHandler& eventHandler )
+void FaceTracker::connectEventHander( const function<void( Face )>& eventHandler )
 {
 	mEventHandler = eventHandler;
 }

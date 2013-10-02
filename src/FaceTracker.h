@@ -104,7 +104,6 @@ public:
 	//////////////////////////////////////////////////////////////////////////////////////////////
 
 protected:
-	typedef std::function<void( Face )>		EventHandler;
 	typedef std::shared_ptr<std::thread>	ThreadRef;
 public:
 	/*! Creates pointer to instance of FaceTracker. Tracks one face at a 
@@ -156,11 +155,11 @@ public:
 	}
 
 	//! Set event handler to method with signature void( FaceTracker::Face ).
-	void							connectEventHander( const EventHandler& eventHandler );
+	void							connectEventHander( const std::function<void( Face )>& eventHandler );
 protected:
 	FaceTracker();
 
-	EventHandler					mEventHandler;
+	std::function<void( Face )>		mEventHandler;
 	volatile bool					mNewFace;
 	volatile bool					mRunning;
 	ThreadRef						mThread;
