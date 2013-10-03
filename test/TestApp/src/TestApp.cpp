@@ -60,7 +60,6 @@ private:
 
 using namespace ci;
 using namespace ci::app;
-using namespace MsKinect;
 using namespace std;
 
 void TestApp::draw()
@@ -82,8 +81,8 @@ void TestApp::draw()
 			gl::draw( tex, tex->getBounds(), Rectf( tex->getBounds() ) * 0.5f );
 		}
 
-		Surface16u surface = depthChannelToSurface( mFrame.getDepthChannel(), 
-			DepthProcessOptions().enableUserColor().enableRemoveBackground() );
+		Surface16u surface = MsKinect::depthChannelToSurface( mFrame.getDepthChannel(), 
+			MsKinect::DepthProcessOptions().enableUserColor().enableRemoveBackground() );
 		{
 			gl::TextureRef tex = gl::Texture::create( surface );
 			gl::pushMatrices();
@@ -96,18 +95,18 @@ void TestApp::draw()
 	gl::disable( GL_TEXTURE_2D );
 
 	uint32_t i = 0;
-	const vector<Skeleton>& skeletons = mFrame.getSkeletons();
-	for ( vector<Skeleton>::const_iterator skeletonIt = skeletons.begin(); skeletonIt != skeletons.end(); ++skeletonIt, i++ ) {
-		gl::color( mDevice->getUserColor( i ) );
-		for ( Skeleton::const_iterator boneIt = skeletonIt->begin(); boneIt != skeletonIt->end(); ++boneIt ) {
-			const Bone& bone	= boneIt->second;
-			Vec2i v0			= mapSkeletonCoordToColor( 
+	const vector<MsKinect::Skeleton>& skeletons = mFrame.getSkeletons();
+	for ( vector<MsKinect::Skeleton>::const_iterator skeletonIt = skeletons.begin(); skeletonIt != skeletons.end(); ++skeletonIt, i++ ) {
+		gl::color( MsKinect::getUserColor( i ) );
+		for ( MsKinect::Skeleton::const_iterator boneIt = skeletonIt->begin(); boneIt != skeletonIt->end(); ++boneIt ) {
+			const MsKinect::Bone& bone	= boneIt->second;
+			Vec2i v0			= MsKinect::mapSkeletonCoordToColor( 
 				bone.getPosition(), 
 				mFrame.getDepthChannel(), 
 				mDevice->getDeviceOptions().getColorResolution(), 
 				mDevice->getDeviceOptions().getDepthResolution() 
 				);
-			Vec2i v1			= mapSkeletonCoordToColor( 
+			Vec2i v1			= MsKinect::mapSkeletonCoordToColor( 
 				skeletonIt->at( bone.getStartJoint() ).getPosition(), 
 				mFrame.getDepthChannel(), 
 				mDevice->getDeviceOptions().getColorResolution(), 
@@ -138,20 +137,20 @@ void TestApp::setup()
 	mFullScreen		= isFullScreen();
 	mFullScreenPrev	= mFullScreen;
 
-	mDevice = Device::create();
-	mDevice->connectEventHandler( [ & ]( Frame frame )
+	mDevice = MsKinect::Device::create();
+	mDevice->connectEventHandler( [ & ]( MsKinect::Frame frame )
 	{
 		mFrame = frame;
 		if ( mFaceTracker ) {
 			mFaceTracker->update( mFrame.getColorSurface(), mFrame.getDepthChannel() );
 		}
 	} );
-	mDevice->start( DeviceOptions() );
+	mDevice->start( MsKinect::DeviceOptions() );
 
-	mFaceTracker = FaceTracker::create();
+	mFaceTracker = MsKinect::FaceTracker::create();
 	mFaceTracker->enableCalcMesh( false );
 	mFaceTracker->enableCalcMesh2d();
-	mFaceTracker->connectEventHander( [ & ]( FaceTracker::Face face ) {
+	mFaceTracker->connectEventHander( [ & ]( MsKinect::FaceTracker::Face face ) {
 		mFace = face;
 	} );
 	mFaceTracker->start();

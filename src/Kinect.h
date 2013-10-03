@@ -103,6 +103,10 @@ size_t									calcNumUsersFromDepth( const ci::Channel16u& depth );
 //! Creates a surface with colorized users from \a depth.
 ci::Surface16u							depthChannelToSurface( const ci::Channel16u& depth, 
 															  const DepthProcessOptions& depthProcessOptions = DepthProcessOptions() );
+//! Returns number of Kinect devices.
+size_t									getDeviceCount();
+//! Returns use color for user ID \a id.
+ci::Colorf								getUserColor( uint32_t id );
 //! Returns pixel location of color position in depth image.
 ci::Vec2i								mapColorCoordToDepth( const ci::Vec2i& v, const ci::Channel16u& depth, 
 															 ImageResolution colorResolution, ImageResolution depthResolution );
@@ -281,25 +285,14 @@ public:
 	
 	//! Creates pointer to instance of Kinect
 	static DeviceRef					create();		
-	//! Returns number of Kinect devices.
-	static int32_t						getDeviceCount();
-	//! Returns use color for user ID \a id.
-	static ci::Colorf					getUserColor( uint32_t id );
-
+	
 	//! Start capturing using settings specified in \a deviceOptions .
 	void								start( const DeviceOptions& deviceOptions = DeviceOptions() );
 	//! Stop capture.
 	void								stop();
 	
-	//! Convert depth image to binary. \a invertImage to flip black and white. Default is false.
-	void								enableBinaryMode( bool enable = true, bool invertImage = false );
-	//! Enables user colors. Depth tracking at 320x240 or less must be enabled. Default is true.
-	void								enableUserColor( bool enable = true );
 	//! Enables verbose error reporting in debug console. Default is true.
 	void								enableVerbose( bool enable = true );
-
-	//! Remove background for better user tracking.
-	void								removeBackground( bool remove = true );
 
 	//! Returns depth value as 0.0 - 1.0 float for pixel at \a pos.
 	float								getDepthAt( const ci::Vec2i& v ) const;
@@ -314,11 +307,6 @@ public:
 
 	//! Returns true is actively capturing.
 	bool								isCapturing() const;
-
-	//! Flips input horizontally if \a flipped is true.
-	void								setFlipped( bool flipped = true );
-	//! Returns true if input is flipped.
-	bool								isFlipped() const;
 
 	//! Sets device angle to \a degrees. Default is 0.
 	void								setTilt( int32_t degrees = 0 );
@@ -336,9 +324,6 @@ protected:
 
 	Device();
 	
-	static std::vector<ci::Colorf>		sUserColors;
-	static std::vector<ci::Colorf>		getUserColors();
-
 	void								init( bool reset = false );
 	virtual void						update();
 

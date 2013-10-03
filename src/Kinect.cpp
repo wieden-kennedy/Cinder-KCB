@@ -186,6 +186,25 @@ Surface16u depthChannelToSurface( const Channel16u& depth, const DepthProcessOpt
 	return surface;
 }
 
+size_t getDeviceCount()
+{
+	return KinectGetSensorCount();
+}
+
+Colorf getUserColor( uint32_t id ) 
+{
+	static vector<Colorf> colors;
+	if ( colors.empty() ) {
+		colors.push_back( Colorf( 0.0f, 1.0f, 1.0f ) );
+		colors.push_back( Colorf( 0.0f, 0.0f, 1.0f ) );
+		colors.push_back( Colorf( 0.0f, 1.0f, 0.0f ) );
+		colors.push_back( Colorf( 0.0f, 0.5f, 1.0f ) );
+		colors.push_back( Colorf( 0.0f, 1.0f, 0.5f ) );
+		colors.push_back( Colorf( 0.0f, 0.5f, 0.5f ) );
+	}
+	return colors.at( ci::math<uint32_t>::clamp( id, 0, 5 ) ); 
+}
+
 Vec2i mapColorCoordToDepth( const Vec2i& v, const Channel16u& depth, 
 						   ImageResolution colorResolution, ImageResolution depthResolution )
 {
@@ -519,29 +538,6 @@ const vector<Skeleton>&	Frame::getSkeletons() const
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 
-vector<Colorf> Device::sUserColors = getUserColors();
-
-ci::Colorf Device::getUserColor( uint32_t id ) 
-{ 
-	return sUserColors.at( ci::math<uint32_t>::clamp( id, 0, 5 ) ); 
-}
-
-vector<Colorf> Device::getUserColors()
-{
-	if ( sUserColors.size() == NUI_SKELETON_COUNT ) {
-		return sUserColors;
-	}
-
-	vector<Colorf> colors;
-	colors.push_back( Colorf( 0.0f, 1.0f, 1.0f ) );
-	colors.push_back( Colorf( 0.0f, 0.0f, 1.0f ) );
-	colors.push_back( Colorf( 0.0f, 1.0f, 0.0f ) );
-	colors.push_back( Colorf( 0.0f, 0.5f, 1.0f ) );
-	colors.push_back( Colorf( 0.0f, 1.0f, 0.5f ) );
-	colors.push_back( Colorf( 0.0f, 0.5f, 0.5f ) );
-	return colors;
-}
-
 DeviceRef Device::create()
 {
 	return DeviceRef( new Device( ) );
@@ -636,13 +632,6 @@ float Device::getDepthAt( const ci::Vec2i& pos ) const
 		depthNorm		= 1.0f - (float)depth / 65535.0f;
 	}
 	return depthNorm;
-}
-	
-int32_t Device::getDeviceCount()
-{
-	int32_t deviceCount = 0;
-	NuiGetSensorCount( &deviceCount );
-	return deviceCount;
 }
 
 const DeviceOptions& Device::getDeviceOptions() const
