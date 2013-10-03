@@ -73,9 +73,10 @@ public:
 	DepthProcessOptions();
 
 	/*! Enables binary mode where background is black and users 
-		are white. Set \a inverted to true to reverse. */
+		are white. Set \a inverted to true to reverse. Enabling 
+		binary mode also enables background removal. */
 	DepthProcessOptions&				enableBinary( bool enable = true, bool inverted = false );
-	//! Sets background to black.
+	//! Normalizes non-user pixels.
 	DepthProcessOptions&				enableRemoveBackground( bool enable = true );
 	//! Colorizes user pixels.
 	DepthProcessOptions&				enableUserColor( bool enable = true );

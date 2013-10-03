@@ -57,8 +57,9 @@ DepthProcessOptions::DepthProcessOptions()
 
 DepthProcessOptions& DepthProcessOptions::enableBinary( bool enable, bool inverted )
 {
-	mBinary			= enable;
-	mBinaryInverted	= inverted;
+	mBinary				= enable;
+	mBinaryInverted		= inverted;
+	mRemoveBackground	= true;
 	return *this;
 }
 
@@ -123,65 +124,63 @@ Surface16u depthChannelToSurface( const Channel16u& depth, const DepthProcessOpt
 			uint16_t v	= 0xFFFF - 0x10000 * ( ( iter.r() & 0xFFF8 ) >> 3 ) / 0x0FFF;
 			uint16_t id = iter.r() & 7;
 
-			struct Pixel
-			{
-				uint16_t r;
-				uint16_t g;
-				uint16_t b;
-			};
-			Pixel pixel;
-			pixel.r = pixel.g = pixel.b = 0;
+			iter.r() = iter.g() = iter.b() = 0;
 
 			if ( depthProcessOptions.isBinaryEnabled() ) {
-				uint16_t backgroundColor	= depthProcessOptions.isBinaryInverted() ? 0xFFFF : 0;
-				uint16_t userColor			= depthProcessOptions.isBinaryInverted() ? 0 : 0xFFFF;
 				if ( id == 0 || id == 7 ) {
-					pixel.r = pixel.g = pixel.b = depthProcessOptions.isRemoveBackgroundEnabled() ? backgroundColor : userColor;
+					iter.r() = iter.g() = iter.b() = depthProcessOptions.isBinaryInverted() ? 0xFFFF : 0;
 				} else {
-					pixel.r = pixel.g = pixel.b = userColor;
+					iter.r() = iter.g() = iter.b() = depthProcessOptions.isBinaryInverted() ? 0 : 0xFFFF;
 				}
 			} else if ( depthProcessOptions.isUserColorEnabled() ) {
 				switch ( id ) {
 				case 0:
 					if ( !depthProcessOptions.isRemoveBackgroundEnabled() ) {
-						pixel.r = pixel.g = pixel.b = v / 4;
+						iter.r() = iter.g() = iter.b() = v / 4;
 					}
 					break;
 				case 1:
-					pixel.r = v;
+					iter.r() = v;
 					break;
 				case 2:
-					pixel.r = v;
-					pixel.g = v;
+					iter.r() = v;
+					iter.g() = v;
 					break;
 				case 3:
-					pixel.r = v;
-					pixel.b = v;
+					iter.r() = v;
+					iter.b() = v;
 					break;
 				case 4:
-					pixel.r = v;
-					pixel.g = v / 2;
+					iter.r() = v;
+					iter.g() = v / 2;
 					break;
 				case 5:
-					pixel.r = v;
-					pixel.b = v / 2;
+					iter.r() = v;
+					iter.b() = v / 2;
 					break;
 				case 6:
-					pixel.r = v;
-					pixel.b = pixel.g = v / 2;
+					iter.r() = v;
+					iter.b() = iter.g() = v / 2;
 					break;
 				case 7:
 					if ( !depthProcessOptions.isRemoveBackgroundEnabled() ) {
-						pixel.r = pixel.g = pixel.b = 0xFFFF - ( v / 2 );
+						iter.r() = iter.g() = iter.b() = 0xFFFF - ( v / 2 );
 					}
 				default:
 					break;
 				}
+			} else if ( depthProcessOptions.isRemoveBackgroundEnabled() ) {
+				if ( id == 0 || id == 7 ) {
+					iter.r() = iter.g() = iter.b() = 0;
+				} else {
+					iter.r() = iter.g() = iter.b() = v;
+				}
+			} else {
+				iter.r() = iter.g() = iter.b() = v;
 			}
-			pixel.r = 0xFFFF - pixel.r;
-			pixel.g = 0xFFFF - pixel.g;
-			pixel.b = 0xFFFF - pixel.b;
-			surface.setPixel( iter.getPos(), ColorT<uint16_t>( pixel.r, pixel.g, pixel.b ) );
+			iter.r() = 0xFFFF - iter.r();
+			iter.g() = 0xFFFF - iter.g();
+			iter.b() = 0xFFFF - iter.b();
 		}
 	}
 	return surface;
@@ -749,7 +748,6 @@ void Device::start( const DeviceOptions& deviceOptions )
 					break;
 				} 
 			}
-
 		}
 
 		if ( mKinect == nullptr ) {
