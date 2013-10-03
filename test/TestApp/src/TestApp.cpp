@@ -97,19 +97,19 @@ void TestApp::draw()
 	gl::disable( GL_TEXTURE_2D );
 
 	uint32_t i = 0;
-	const vector<MsKinect::Skeleton>& skeletons = mFrame.getSkeletons();
-	for ( vector<MsKinect::Skeleton>::const_iterator skeletonIt = skeletons.begin(); skeletonIt != skeletons.end(); ++skeletonIt, i++ ) {
+	for ( const auto& skeleton : mFrame.getSkeletons() ) {
 		gl::color( MsKinect::getUserColor( i ) );
-		for ( MsKinect::Skeleton::const_iterator boneIt = skeletonIt->begin(); boneIt != skeletonIt->end(); ++boneIt ) {
-			const MsKinect::Bone& bone	= boneIt->second;
-			Vec2i v0			= MsKinect::mapSkeletonCoordToColor( 
+		for ( const auto& joint : skeleton ) {
+			const MsKinect::Bone& bone = joint.second;
+
+			Vec2i v0 = MsKinect::mapSkeletonCoordToColor( 
 				bone.getPosition(), 
 				mFrame.getDepthChannel(), 
 				mDevice->getDeviceOptions().getColorResolution(), 
 				mDevice->getDeviceOptions().getDepthResolution() 
 				);
-			Vec2i v1			= MsKinect::mapSkeletonCoordToColor( 
-				skeletonIt->at( bone.getStartJoint() ).getPosition(), 
+			Vec2i v1 = MsKinect::mapSkeletonCoordToColor( 
+				skeleton.at( bone.getStartJoint() ).getPosition(), 
 				mFrame.getDepthChannel(), 
 				mDevice->getDeviceOptions().getColorResolution(), 
 				mDevice->getDeviceOptions().getDepthResolution() 
