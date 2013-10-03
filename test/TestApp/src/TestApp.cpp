@@ -34,8 +34,6 @@
 * 
 */
 
-// TODO fix memory leak in FT mesh calc
-
 #include "cinder/app/AppBasic.h"
 #include "cinder/gl/Texture.h"
 #include "cinder/params/Params.h"

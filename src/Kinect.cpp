@@ -202,7 +202,7 @@ Colorf getUserColor( uint32_t id )
 		colors.push_back( Colorf( 0.0f, 1.0f, 0.5f ) );
 		colors.push_back( Colorf( 0.0f, 0.5f, 0.5f ) );
 	}
-	return colors.at( ci::math<uint32_t>::clamp( id, 0, 5 ) ); 
+	return colors.at( ci::math<uint32_t>::clamp( id - 1, 0, 5 ) ); 
 }
 
 Vec2i mapColorCoordToDepth( const Vec2i& v, const Channel16u& depth, 

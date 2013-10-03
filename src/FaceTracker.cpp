@@ -339,7 +339,8 @@ void FaceTracker::run()
 							
 					if ( numAnimationUnits > 0 && numShapeUnits > 0 && numVertices > 0 ) {
 						if ( mCalcMesh ) {
-							FT_VECTOR3D* pts = reinterpret_cast<FT_VECTOR3D*>( _malloca( sizeof( FT_VECTOR3D ) * numVertices ) );
+							FT_VECTOR3D* pts		= new FT_VECTOR3D[ numVertices ];
+							pts[ numVertices - 1 ]	= 0;
 							hr = mModel->Get3DShape( shapeUnits, numShapeUnits, animationUnits, numAnimationUnits, scale, rotation, translation, pts, numVertices );
 							if ( SUCCEEDED( hr ) ) {
 								for ( size_t i = 0; i < numVertices; ++i ) {
@@ -356,12 +357,13 @@ void FaceTracker::run()
 									}
 								}
 							}
-							_freea( pts );
+							delete [] pts;
 						}
 
 						if ( mCalcMesh2d ) {
 							tagPOINT viewOffset	= { 0, 0 };
-							FT_VECTOR2D* pts	= reinterpret_cast<FT_VECTOR2D*>( _malloca( sizeof( FT_VECTOR2D ) * numVertices ) );
+							FT_VECTOR2D* pts		= new FT_VECTOR2D[ numVertices ];
+							pts[ numVertices - 1 ]	= 0;
 							hr = mModel->GetProjectedShape( &mConfigColor, mSensorData.ZoomFactor, viewOffset, shapeUnits, numShapeUnits, animationUnits, 
 								numAnimationUnits, scale, rotation, translation, pts, numVertices );
 							if ( SUCCEEDED( hr ) ) {
@@ -379,7 +381,7 @@ void FaceTracker::run()
 									}
 								}
 							}
-							_freea( pts );
+							delete [] pts;
 						}
 					}
 
