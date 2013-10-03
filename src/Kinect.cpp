@@ -193,16 +193,24 @@ size_t getDeviceCount()
 
 Colorf getUserColor( uint32_t id ) 
 {
-	static vector<Colorf> colors;
-	if ( colors.empty() ) {
-		colors.push_back( Colorf( 0.0f, 1.0f, 1.0f ) );
-		colors.push_back( Colorf( 0.0f, 0.0f, 1.0f ) );
-		colors.push_back( Colorf( 0.0f, 1.0f, 0.0f ) );
-		colors.push_back( Colorf( 0.0f, 0.5f, 1.0f ) );
-		colors.push_back( Colorf( 0.0f, 1.0f, 0.5f ) );
-		colors.push_back( Colorf( 0.0f, 0.5f, 0.5f ) );
+	switch ( id ) {
+	case 0:
+		return Colorf::black();
+	case 1:
+		return Colorf( 0.0f, 1.0f, 1.0f );
+	case 2:
+		return Colorf( 0.0f, 0.0f, 1.0f );
+	case 3:
+		return Colorf( 0.0f, 1.0f, 0.0f );
+	case 4:
+		return Colorf( 0.0f, 0.5f, 1.0f );
+	case 5:
+		return Colorf( 0.0f, 1.0f, 0.5f );
+	case 6:
+		return Colorf( 0.0f, 0.5f, 0.5f );
+	default:
+		return Colorf::white();
 	}
-	return colors.at( ci::math<uint32_t>::clamp( id - 1, 0, 5 ) ); 
 }
 
 Vec2i mapColorCoordToDepth( const Vec2i& v, const Channel16u& depth, 
