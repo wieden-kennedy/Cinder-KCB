@@ -305,6 +305,7 @@ void FaceTracker::run()
 		
 			if ( mSuccess ) {
 				hr = mFaceTracker->GetFaceModel( &mModel );
+
 				if ( SUCCEEDED( hr ) ) {
 					float* shapeUnits		= 0;
 					size_t numShapeUnits	= 0;

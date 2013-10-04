@@ -97,16 +97,17 @@ bool DepthProcessOptions::isUserColorEnabled() const
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 
-const double kTiltRequestInterval = 1.5;
-
-size_t calcNumUsersFromDepth( const ci::Channel16u& depth )
+size_t calcNumUsersFromDepth( const Channel16u& depth )
 {
-	std::map<uint16_t, bool> users;
-	Channel16u::ConstIter iter = depth.getIter();
+	if ( !depth ) {
+		return 0;
+	}
+	map<uint16_t, bool> users;
+	Surface16u surface( depth );
+	Surface16u::ConstIter iter = surface.getIter();
 	while ( iter.line() ) {
 		while ( iter.pixel() ) {
-			uint16_t v	= iter.v();
-			uint16_t id = v & 7;
+			uint16_t id = NuiDepthPixelToPlayerIndex( iter.r() );
 			if ( id > 0 && id < 7 ) {
 				users[ id ] = true;
 			}
@@ -121,66 +122,36 @@ Surface16u depthChannelToSurface( const Channel16u& depth, const DepthProcessOpt
 	Surface16u::Iter iter = surface.getIter();
 	while ( iter.line() ) {
 		while ( iter.pixel() ) {
-			uint16_t v	= 0xFFFF - 0x10000 * ( ( iter.r() & 0xFFF8 ) >> 3 ) / 0x0FFF;
-			uint16_t id = iter.r() & 7;
-
-			iter.r() = iter.g() = iter.b() = 0;
-
+			uint16_t v	= 0x10000 * ( ( iter.r() & 0xFFF8 ) >> 3 ) / 0x0FFF;
+			uint16_t id = NuiDepthPixelToPlayerIndex( iter.r() );
 			if ( depthProcessOptions.isBinaryEnabled() ) {
-				if ( id == 0 || id == 7 ) {
+				if ( id < 1 || id > 6 ) {
 					iter.r() = iter.g() = iter.b() = depthProcessOptions.isBinaryInverted() ? 0xFFFF : 0;
 				} else {
 					iter.r() = iter.g() = iter.b() = depthProcessOptions.isBinaryInverted() ? 0 : 0xFFFF;
 				}
 			} else if ( depthProcessOptions.isUserColorEnabled() ) {
-				switch ( id ) {
-				case 0:
+				if ( id < 1 || id > 6 ) {
 					if ( !depthProcessOptions.isRemoveBackgroundEnabled() ) {
-						iter.r() = iter.g() = iter.b() = v / 4;
+						iter.r() = iter.g() = iter.b() = v;
+					} else {
+						iter.r() = iter.g() = iter.b() = 0xFFFF;
 					}
-					break;
-				case 1:
-					iter.r() = v;
-					break;
-				case 2:
-					iter.r() = v;
-					iter.g() = v;
-					break;
-				case 3:
-					iter.r() = v;
-					iter.b() = v;
-					break;
-				case 4:
-					iter.r() = v;
-					iter.g() = v / 2;
-					break;
-				case 5:
-					iter.r() = v;
-					iter.b() = v / 2;
-					break;
-				case 6:
-					iter.r() = v;
-					iter.b() = iter.g() = v / 2;
-					break;
-				case 7:
-					if ( !depthProcessOptions.isRemoveBackgroundEnabled() ) {
-						iter.r() = iter.g() = iter.b() = 0xFFFF - ( v / 2 );
-					}
-				default:
-					break;
+				} else {
+					Colorf color	= getUserColor( id );
+					iter.r()		= (uint16_t)( (float)v * color.r );
+					iter.g()		= (uint16_t)( (float)v * color.g );
+					iter.b()		= (uint16_t)( (float)v * color.b );
 				}
 			} else if ( depthProcessOptions.isRemoveBackgroundEnabled() ) {
-				if ( id == 0 || id == 7 ) {
-					iter.r() = iter.g() = iter.b() = 0;
+				if ( id < 1 || id > 6 ) {
+					iter.r() = iter.g() = iter.b() = 0xFFFF;
 				} else {
 					iter.r() = iter.g() = iter.b() = v;
 				}
 			} else {
 				iter.r() = iter.g() = iter.b() = v;
 			}
-			iter.r() = 0xFFFF - iter.r();
-			iter.g() = 0xFFFF - iter.g();
-			iter.b() = 0xFFFF - iter.b();
 		}
 	}
 	return surface;
@@ -197,17 +168,17 @@ Colorf getUserColor( uint32_t id )
 	case 0:
 		return Colorf::black();
 	case 1:
-		return Colorf( 0.0f, 1.0f, 1.0f );
+		return Colorf( 1.0f, 0.0f, 0.0f );
 	case 2:
-		return Colorf( 0.0f, 0.0f, 1.0f );
-	case 3:
 		return Colorf( 0.0f, 1.0f, 0.0f );
+	case 3:
+		return Colorf( 0.0f, 0.0f, 1.0f );
 	case 4:
-		return Colorf( 0.0f, 0.5f, 1.0f );
+		return Colorf( 1.0f, 1.0f, 0.0f );
 	case 5:
-		return Colorf( 0.0f, 1.0f, 0.5f );
+		return Colorf( 0.0f, 1.0f, 1.0f );
 	case 6:
-		return Colorf( 0.0f, 0.5f, 0.5f );
+		return Colorf( 1.0f, 0.0f, 1.0f );
 	default:
 		return Colorf::white();
 	}
@@ -249,7 +220,7 @@ Vec2i mapSkeletonCoordToDepth( const Vec3f& v, ImageResolution depthResolution )
 
 uint16_t userIdFromDepthCoord( const Channel16u& depth, const Vec2i& v )
 {
-	return ( depth.getValue( v ) & 7 ) % 7;
+	return NuiDepthPixelToPlayerIndex( depth.getValue( v ) );
 }
 
 Matrix44f toMatrix44f( const Matrix4& m ) 
@@ -514,7 +485,7 @@ Frame::Frame()
 }
 
 Frame::Frame( long long frameId, const std::string& deviceId, 
-		const ci::Surface8u& color, const ci::Channel16u& depth, const std::vector<Skeleton>& skeletons )
+			 const Surface8u& color, const Channel16u& depth, const std::vector<Skeleton>& skeletons )
 	: mColorSurface( color ), mDepthChannel( depth ), mDeviceId( deviceId ), mFrameId( frameId ), mSkeletons( skeletons )
 {
 }
@@ -631,7 +602,7 @@ void Device::errorNui( long hr ) {
 	console() << endl;
 }
 
-float Device::getDepthAt( const ci::Vec2i& pos ) const
+float Device::getDepthAt( const Vec2i& pos ) const
 {
 	float depthNorm		= 0.0f;
 	if ( mChannelDepth ) {
@@ -704,7 +675,7 @@ bool Device::isCapturing() const
 void Device::setTilt( int32_t degrees )
 {
 	double elapsedSeconds = getElapsedSeconds();
-	if ( mCapture && mNuiSensor != 0 && elapsedSeconds - mTiltRequestTime > kTiltRequestInterval ) {
+	if ( mCapture && mNuiSensor != 0 && elapsedSeconds - mTiltRequestTime > 1.5 ) {
 		long hr = mNuiSensor->NuiCameraElevationSetAngle( (long)math<int32_t>::clamp( degrees, -MAXIMUM_TILT_ANGLE, MAXIMUM_TILT_ANGLE ) );
 		if ( FAILED( hr ) ) {
 			console() << "Unable to change device angle: " << endl;

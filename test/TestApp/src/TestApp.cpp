@@ -55,6 +55,7 @@ private:
 	float						mFrameRate;
 	bool						mFullScreen;
 	bool						mFullScreenPrev;
+	int32_t						mNumUsers;
 	ci::params::InterfaceGlRef	mParams;
 };
 
@@ -67,7 +68,8 @@ void TestApp::draw()
 	gl::setViewport( getWindowBounds() );
 	gl::clear();
 	gl::setMatricesWindow( getWindowSize() );
-
+	gl::enableAlphaBlending();
+	
 	gl::enable( GL_TEXTURE_2D );
 	gl::color( ColorAf::white() );
 	
@@ -76,27 +78,25 @@ void TestApp::draw()
 	}
 
 	if ( mFrame.getDepthChannel() ) {
-		{
-			gl::TextureRef tex = gl::Texture::create( mFrame.getDepthChannel() );
-			gl::draw( tex, tex->getBounds(), Rectf( tex->getBounds() ) * 0.5f );
-		}
-
+		gl::pushMatrices();
+		gl::TextureRef texDepth = gl::Texture::create( mFrame.getDepthChannel() );
+		gl::translate( (float)( getWindowWidth() - texDepth->getWidth() / 2 ), 0.0f );
+		gl::draw( texDepth, texDepth->getBounds(), Rectf( texDepth->getBounds() ) * 0.5f );
 		Surface16u surface = MsKinect::depthChannelToSurface( mFrame.getDepthChannel(), 
 			MsKinect::DepthProcessOptions().enableUserColor().enableRemoveBackground() );
-		{
-			gl::TextureRef tex = gl::Texture::create( surface );
-			gl::pushMatrices();
-			gl::translate( 0, tex->getHeight() / 2 );
-			gl::draw( tex, tex->getBounds(), Rectf( tex->getBounds() ) * 0.5f );
-			gl::popMatrices();
-		}
+		gl::TextureRef texUsers = gl::Texture::create( surface );
+		gl::pushMatrices();
+		gl::translate( 0.0f, (float)( texUsers->getHeight() / 2 ) );
+		gl::draw( texUsers, texUsers->getBounds(), Rectf( texUsers->getBounds() ) * 0.5f );
+		gl::popMatrices();
+		gl::popMatrices();
 	}
 
 	gl::disable( GL_TEXTURE_2D );
 
-	uint32_t i = 0;
+	uint32_t id = 1;
 	for ( const auto& skeleton : mFrame.getSkeletons() ) {
-		gl::color( MsKinect::getUserColor( i ) );
+		gl::color( MsKinect::getUserColor( id ) );
 		for ( const auto& joint : skeleton ) {
 			const MsKinect::Bone& bone = joint.second;
 
@@ -115,6 +115,7 @@ void TestApp::draw()
 			gl::drawLine( v0, v1 );
 			gl::drawSolidCircle( v0, 5.0f, 16 );
 		}
+		++id;
 	}
 
 	if ( mFace.getMesh2d().getNumVertices() > 0 ) {
@@ -123,6 +124,8 @@ void TestApp::draw()
 		gl::draw( mFace.getMesh2d() );
 		gl::disableWireframe();
 	}
+
+	mParams->draw();
 }
 
 void TestApp::prepareSettings( Settings* settings )
@@ -136,6 +139,7 @@ void TestApp::setup()
 	mFrameRate		= 0.0f;
 	mFullScreen		= isFullScreen();
 	mFullScreenPrev	= mFullScreen;
+	mNumUsers		= 0;
 
 	mDevice = MsKinect::Device::create();
 	mDevice->connectEventHandler( [ & ]( MsKinect::Frame frame )
@@ -144,6 +148,7 @@ void TestApp::setup()
 		if ( mFaceTracker ) {
 			mFaceTracker->update( mFrame.getColorSurface(), mFrame.getDepthChannel() );
 		}
+		mNumUsers = (int32_t)MsKinect::calcNumUsersFromDepth( mFrame.getDepthChannel() );
 	} );
 	mDevice->start( MsKinect::DeviceOptions() );
 
@@ -155,14 +160,17 @@ void TestApp::setup()
 	} );
 	mFaceTracker->start();
 
-	mParams = params::InterfaceGl::create( "PARAMS", Vec2i( 200, 60 ) );
+	mParams = params::InterfaceGl::create( "PARAMS", Vec2i( 200, 120 ) );
 	mParams->addParam( "Frame rate",	&mFrameRate,					"", true );
+	mParams->addParam( "User count",	&mNumUsers,						"", true );
 	mParams->addParam( "Full screen",	&mFullScreen,					"key=f" );
 	mParams->addButton( "Quit",			bind( &TestApp::quit, this ),	"key=q" );
 }
 
 void TestApp::update()
 {
+	mFrameRate = getAverageFps();
+
 	if ( mFullScreenPrev != mFullScreen ) {
 		setFullScreen( mFullScreen );
 		mFullScreenPrev = mFullScreen;
