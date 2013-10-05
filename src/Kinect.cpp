@@ -308,6 +308,7 @@ DeviceOptions::DeviceOptions()
 	mDeviceIndex			= 0;
 	mEnabledColor			= true;
 	mEnabledDepth			= true;
+	mEnabledInfrared		= false;
 	mEnabledNearMode		= false;
 	mEnabledSeatedMode		= false;
 	mEnabledUserTracking	= true;
@@ -315,6 +316,7 @@ DeviceOptions::DeviceOptions()
 	mSkeletonSelectionMode	= SkeletonSelectionMode::SkeletonSelectionModeDefault;
 	setColorResolution( ImageResolution::NUI_IMAGE_RESOLUTION_640x480 );
 	setDepthResolution( ImageResolution::NUI_IMAGE_RESOLUTION_320x240 );
+	setInfraredResolution( ImageResolution::NUI_IMAGE_RESOLUTION_320x240 );
 }
 
 DeviceOptions& DeviceOptions::enableColor( bool enable )
@@ -326,6 +328,12 @@ DeviceOptions& DeviceOptions::enableColor( bool enable )
 DeviceOptions& DeviceOptions::enableDepth( bool enable )
 {
 	mEnabledDepth = enable;
+	return *this;
+}
+
+DeviceOptions& DeviceOptions::enableInfrared( bool enable )
+{
+	mEnabledInfrared = enable;
 	return *this;
 }
 
@@ -377,6 +385,16 @@ int32_t DeviceOptions::getDeviceIndex() const
 	return mDeviceIndex;
 }
 
+ImageResolution DeviceOptions::getInfraredResolution() const
+{
+	return mInfraredResolution;
+}
+	
+const Vec2i& DeviceOptions::getInfraredSize() const
+{
+	return mInfraredSize;
+}
+
 SkeletonSelectionMode DeviceOptions::getSkeletonSelectionMode() const
 {
 	return mSkeletonSelectionMode;
@@ -390,6 +408,11 @@ SkeletonTransform DeviceOptions::getSkeletonTransform() const
 bool DeviceOptions::isDepthEnabled() const
 {
 	return mEnabledDepth;
+}
+
+bool DeviceOptions::isInfraredEnabled() const
+{
+	return mEnabledInfrared;
 }
 	
 bool DeviceOptions::isNearModeEnabled() const
@@ -414,18 +437,18 @@ bool DeviceOptions::isColorEnabled() const
 
 DeviceOptions& DeviceOptions::setColorResolution( const ImageResolution& resolution )
 {
-	mColorResolution = resolution;
+	mColorResolution		= resolution;
 	switch ( mColorResolution ) {
 	case ImageResolution::NUI_IMAGE_RESOLUTION_1280x960:
-		mColorSize = Vec2i( 1280, 960 );
+		mColorSize			= Vec2i( 1280, 960 );
 		break;
 	case ImageResolution::NUI_IMAGE_RESOLUTION_640x480:
-		mColorSize = Vec2i( 640, 480 );
+		mColorSize			= Vec2i( 640, 480 );
 		break;
 	default:
-		mColorResolution = NUI_IMAGE_RESOLUTION_INVALID;
-		mColorSize = Vec2i::zero();
-		mEnabledColor = false;
+		mColorResolution	= NUI_IMAGE_RESOLUTION_INVALID;
+		mColorSize			= Vec2i::zero();
+		mEnabledColor		= false;
 		break;
 	}
 	return *this;
@@ -433,21 +456,21 @@ DeviceOptions& DeviceOptions::setColorResolution( const ImageResolution& resolut
 
 DeviceOptions& DeviceOptions::setDepthResolution( const ImageResolution& resolution )
 {
-	mDepthResolution = resolution;
+	mDepthResolution		= resolution;
 	switch ( mDepthResolution ) {
 	case ImageResolution::NUI_IMAGE_RESOLUTION_640x480:
-		mDepthSize					= Vec2i( 640, 480 );
+		mDepthSize			= Vec2i( 640, 480 );
 		break;
 	case ImageResolution::NUI_IMAGE_RESOLUTION_320x240:
-		mDepthSize = Vec2i( 320, 240 );
+		mDepthSize			= Vec2i( 320, 240 );
 		break;
 	case ImageResolution::NUI_IMAGE_RESOLUTION_80x60:
-		mDepthSize = Vec2i( 80, 60 );
+		mDepthSize			= Vec2i( 80, 60 );
 		break;
 	default:
-		mDepthResolution = NUI_IMAGE_RESOLUTION_INVALID;
-		mDepthSize = Vec2i::zero();
-		mEnabledDepth = false;
+		mDepthResolution	= NUI_IMAGE_RESOLUTION_INVALID;
+		mDepthSize			= Vec2i::zero();
+		mEnabledDepth		= false;
 		break;
 	}
 	return *this;
@@ -462,6 +485,28 @@ DeviceOptions& DeviceOptions::setDeviceId( const std::string& id )
 DeviceOptions& DeviceOptions::setDeviceIndex( int32_t index )
 {
 	mDeviceIndex = index;
+	return *this;
+}
+
+DeviceOptions& DeviceOptions::setInfraredResolution( const ImageResolution& resolution )
+{
+	mInfraredResolution		= resolution;
+	switch ( mInfraredResolution ) {
+	case ImageResolution::NUI_IMAGE_RESOLUTION_640x480:
+		mInfraredSize		= Vec2i( 640, 480 );
+		break;
+	case ImageResolution::NUI_IMAGE_RESOLUTION_320x240:
+		mInfraredSize		= Vec2i( 320, 240 );
+		break;
+	case ImageResolution::NUI_IMAGE_RESOLUTION_80x60:
+		mInfraredSize		= Vec2i( 80, 60 );
+		break;
+	default:
+		mInfraredResolution	= NUI_IMAGE_RESOLUTION_INVALID;
+		mInfraredSize		= Vec2i::zero();
+		mEnabledInfrared	= false;
+		break;
+	}
 	return *this;
 }
 
@@ -484,9 +529,10 @@ Frame::Frame()
 {
 }
 
-Frame::Frame( long long frameId, const std::string& deviceId, 
-			 const Surface8u& color, const Channel16u& depth, const std::vector<Skeleton>& skeletons )
-	: mColorSurface( color ), mDepthChannel( depth ), mDeviceId( deviceId ), mFrameId( frameId ), mSkeletons( skeletons )
+Frame::Frame( long long frameId, const std::string& deviceId, const Surface8u& color, 
+			 const Channel16u& depth, const Channel16u& infrared, const std::vector<Skeleton>& skeletons )
+	: mColorSurface( color ), mDepthChannel( depth ), mDeviceId( deviceId ), mFrameId( frameId ), 
+	mInfraredChannel( infrared ), mSkeletons( skeletons )
 {
 }
 
@@ -508,6 +554,11 @@ const std::string& Frame::getDeviceId() const
 long long Frame::getFrameId() const
 {
 	return mFrameId;
+}
+
+const Channel16u& Frame::getInfraredChannel() const
+{
+	return mInfraredChannel;
 }
 
 const vector<Skeleton>&	Frame::getSkeletons() const
@@ -649,6 +700,7 @@ void Device::init( bool reset )
 
 	mBufferColor		= nullptr;
 	mBufferDepth		= nullptr;
+	mBufferInfrared		= nullptr;
 	mCapture			= false;
 	mFrameId			= 0;
 	mKinect				= nullptr;
@@ -658,6 +710,9 @@ void Device::init( bool reset )
 
 	if ( mChannelDepth ) {
 		mChannelDepth.reset();
+	}
+	if ( mChannelInfrared ) {
+		mChannelInfrared.reset();
 	}
 	if ( mSurfaceColor ) {
 		mSurfaceColor.reset();
@@ -765,6 +820,19 @@ void Device::start( const DeviceOptions& deviceOptions )
 			}
 		}
 
+		if ( mDeviceOptions.isInfraredEnabled() && mDeviceOptions.getInfraredResolution() != ImageResolution::NUI_IMAGE_RESOLUTION_INVALID ) {
+			KINECT_IMAGE_FRAME_FORMAT format	= { sizeof( KINECT_IMAGE_FRAME_FORMAT ), 0 };
+			mFormatInfrared						= format;
+			hr = KinectEnableIRStream( mKinect, mDeviceOptions.getInfraredResolution(), &mFormatInfrared );
+			if ( SUCCEEDED( hr ) ) {
+				mBufferInfrared					= new uint8_t[ mFormatInfrared.cbBufferSize ];
+			} else {
+				mDeviceOptions.enableInfrared( false );
+				console() << "Unable to initialize infrared stream: ";
+				errorNui( hr );
+			}
+		}
+
 		if ( mDeviceOptions.isUserTrackingEnabled() ) {
 			hr = KinectEnableSkeletalStream( mKinect, mDeviceOptions.isSeatedModeEnabled(), 
 				mDeviceOptions.getSkeletonSelectionMode(), &kTransformParams[ mDeviceOptions.getSkeletonTransform() ] );
@@ -831,6 +899,9 @@ void Device::stop()
 	if ( mBufferColor != nullptr ) {
 		delete [] mBufferColor;
 	}
+	if ( mBufferInfrared != nullptr ) {
+		delete [] mBufferInfrared;
+	}
 	KinectCloseSensor( mKinect );
 	init( true );
 }
@@ -847,6 +918,9 @@ void Device::update()
 	if ( mChannelDepth ) {
 		mChannelDepth.reset();
 	}
+	if ( mChannelInfrared ) {
+		mChannelInfrared.reset();
+	}
 
 	long long timestamp;
 	if ( mDeviceOptions.isColorEnabled() && 
@@ -861,6 +935,12 @@ void Device::update()
 		mChannelDepth = Channel16u( (int32_t)mFormatDepth.dwWidth, (int32_t)mFormatDepth.dwHeight, 
 			(int32_t)mFormatDepth.dwWidth * (int32_t)mFormatDepth.cbBytesPerPixel, 0, 
 			(uint16_t*)mBufferDepth );
+    }
+	if ( mDeviceOptions.isInfraredEnabled() && 
+		SUCCEEDED( KinectGetColorFrame( mKinect, mFormatInfrared.cbBufferSize, mBufferInfrared, &timestamp ) ) ) {
+		mChannelInfrared = Channel16u( (int32_t)mFormatInfrared.dwWidth, (int32_t)mFormatInfrared.dwHeight, 
+			(int32_t)mFormatInfrared.dwWidth * (int32_t)mFormatInfrared.cbBytesPerPixel, 0, 
+			(uint16_t*)mBufferInfrared );
     }
 
 	NUI_SKELETON_FRAME skeletonFrame;
@@ -884,7 +964,7 @@ void Device::update()
 		}
 	}
 
-	Frame frame( mFrameId, mDeviceOptions.getDeviceId(), mSurfaceColor, mChannelDepth, mSkeletons );
+	Frame frame( mFrameId, mDeviceOptions.getDeviceId(), mSurfaceColor, mChannelDepth, mChannelInfrared, mSkeletons );
 	mEventHandler( frame );
 	++mFrameId;
 

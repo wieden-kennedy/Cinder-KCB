@@ -77,10 +77,18 @@ void TestApp::draw()
 		gl::draw( gl::Texture::create( mFrame.getColorSurface() ) );
 	}
 
+	if ( mFrame.getInfraredChannel() ) {
+		gl::pushMatrices();
+		gl::TextureRef tex = gl::Texture::create( mFrame.getInfraredChannel() );
+		gl::translate( (float)( getWindowWidth() - tex->getWidth() / 2 ), 0.0f );
+		gl::draw( tex, tex->getBounds(), Rectf( tex->getBounds() ) * 0.5f );
+		gl::popMatrices();
+	}
+
 	if ( mFrame.getDepthChannel() ) {
 		gl::pushMatrices();
 		gl::TextureRef texDepth = gl::Texture::create( mFrame.getDepthChannel() );
-		gl::translate( (float)( getWindowWidth() - texDepth->getWidth() / 2 ), 0.0f );
+		gl::translate( (float)( getWindowWidth() - texDepth->getWidth() / 2 ), (float)( texDepth->getHeight() / 2 ) );
 		gl::draw( texDepth, texDepth->getBounds(), Rectf( texDepth->getBounds() ) * 0.5f );
 		Surface16u surface = MsKinect::depthChannelToSurface( mFrame.getDepthChannel(), 
 			MsKinect::DepthProcessOptions().enableUserColor().enableRemoveBackground() );
@@ -150,7 +158,7 @@ void TestApp::setup()
 		}
 		mNumUsers = (int32_t)MsKinect::calcNumUsersFromDepth( mFrame.getDepthChannel() );
 	} );
-	mDevice->start( MsKinect::DeviceOptions() );
+	mDevice->start();
 
 	mFaceTracker = MsKinect::FaceTracker::create();
 	mFaceTracker->enableCalcMesh( false );

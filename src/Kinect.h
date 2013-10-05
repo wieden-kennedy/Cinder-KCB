@@ -175,11 +175,15 @@ public:
 	//! Returns resolution of depth image.
 	ImageResolution						getDepthResolution() const; 
 	//! Returns size of depth image.
-	const ci::Vec2i&					getDepthSize() const; 
+	const ci::Vec2i&					getDepthSize() const;
 	//! Returns unique ID for this device.
 	const std::string&					getDeviceId() const;
 	//! Returns 0-index for this device.
 	int32_t								getDeviceIndex() const;
+	//! Returns resolution of infrared image.
+	ImageResolution						getInfraredResolution() const; 
+	//! Returns size of infrared image.
+	const ci::Vec2i&					getInfraredSize() const;
 	//! Returns skeleton selection mode for this device.
 	SkeletonSelectionMode				getSkeletonSelectionMode() const;
 	//! Returns skeleton transform for this device.
@@ -189,6 +193,8 @@ public:
 	bool								isColorEnabled() const;
 	//! Returns true if depth tracking is enabled.
 	bool								isDepthEnabled() const;
+	//! Returns true if infrared stream is enabled.
+	bool								isInfraredEnabled() const;
 	//! Returns true if near mode is enabled.
 	bool								isNearModeEnabled() const;
 	//! Returns true if seated mode is enabled.
@@ -198,8 +204,10 @@ public:
 
 	//! Enables color stream.
 	DeviceOptions&						enableColor( bool enable = true );
-	//! Enables depth tracking.
+	//! Enables depth stream.
 	DeviceOptions&						enableDepth( bool enable = true );
+	//! Enables infrared stream.
+	DeviceOptions&						enableInfrared( bool enable = true );
 	//! Enables near mode. Kinect for Windows only.
 	DeviceOptions&						enableNearMode( bool enable = true );
 	//! Enables seated mode. Kinect for Windows only.
@@ -215,6 +223,8 @@ public:
 	DeviceOptions&						setDeviceId( const std::string& id = "" ); 
 	//! Starts device with this 0-index.
 	DeviceOptions&						setDeviceIndex( int32_t index = 0 ); 
+	//! Sets resolution of infrared image.
+	DeviceOptions&						setInfraredResolution( const ImageResolution& resolution = ImageResolution::NUI_IMAGE_RESOLUTION_320x240 ); 
 	//! Set skeleton selection mode to \a mode.
 	DeviceOptions& 						setSkeletonSelectionMode( SkeletonSelectionMode mode );
 	//! Set skeleton transform to \a tranform.
@@ -222,6 +232,7 @@ public:
 protected:
 	bool								mEnabledColor;
 	bool								mEnabledDepth;
+	bool								mEnabledInfrared;
 	bool								mEnabledNearMode;
 	bool								mEnabledSeatedMode;
 	bool								mEnabledUserTracking;
@@ -233,6 +244,8 @@ protected:
 	ci::Vec2i							mColorSize;
 	ImageResolution						mDepthResolution;
 	ci::Vec2i							mDepthSize;
+	ImageResolution						mInfraredResolution;
+	ci::Vec2i							mInfraredSize;
 
 	std::string							mDeviceId;
 	int32_t								mDeviceIndex;
@@ -249,20 +262,24 @@ public:
 
 	//! Returns color surface for this frame.
 	const ci::Surface8u&				getColorSurface() const;
-	//! Returns depth surface for this frame.
+	//! Returns depth channel for this frame.
 	const ci::Channel16u&				getDepthChannel() const;
 	//! Returns unique identifier for the sensor that generated the frame.
 	const std::string&					getDeviceId() const;
 	//! Returns unique, sequential frame ID.
 	long long							getFrameId() const;
+	//! Returns infrared channel for this frame.
+	const ci::Channel16u&				getInfraredChannel() const;
 	//! Returns skeletons for this frame.
 	const std::vector<Skeleton>&		getSkeletons() const;
 protected:
-	Frame( long long frameId, const std::string& deviceId, 
-		const ci::Surface8u& color, const ci::Channel16u& depth, const std::vector<Skeleton>& skeletons );
+	Frame( long long frameId, const std::string& deviceId, const ci::Surface8u& color, 
+		const ci::Channel16u& depth, const ci::Channel16u& infrared, 
+		const std::vector<Skeleton>& skeletons );
 
 	ci::Surface8u						mColorSurface;
 	ci::Channel16u						mDepthChannel;
+	ci::Channel16u						mInfraredChannel;
 	std::string							mDeviceId;
 	long long							mFrameId;
 	std::vector<Skeleton>				mSkeletons;
@@ -336,9 +353,12 @@ protected:
 
 	uint8_t*							mBufferColor;
 	uint8_t*							mBufferDepth;
+	uint8_t*							mBufferInfrared;
 	ci::Channel16u						mChannelDepth;
+	ci::Channel16u						mChannelInfrared;
 	KINECT_IMAGE_FRAME_FORMAT			mFormatColor;
 	KINECT_IMAGE_FRAME_FORMAT			mFormatDepth;
+	KINECT_IMAGE_FRAME_FORMAT			mFormatInfrared;
 	long long							mFrameId;
 	std::vector<Skeleton>				mSkeletons;
 	ci::Surface8u						mSurfaceColor;
