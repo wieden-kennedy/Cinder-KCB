@@ -49,12 +49,16 @@ public:
 	void						update();
 private:
 	MsKinect::DeviceRef			mDevice;
+	MsKinect::Frame				mFrame;
+	
 	MsKinect::FaceTracker::Face	mFace;
 	MsKinect::FaceTrackerRef	mFaceTracker;
-	MsKinect::Frame				mFrame;
+	
 	float						mFrameRate;
 	bool						mFullScreen;
 	bool						mFullScreenPrev;
+	int32_t						mTilt;
+	int32_t						mTiltPrev;
 	int32_t						mNumUsers;
 	ci::params::InterfaceGlRef	mParams;
 };
@@ -90,8 +94,10 @@ void TestApp::draw()
 		gl::TextureRef texDepth = gl::Texture::create( mFrame.getDepthChannel() );
 		gl::translate( (float)( getWindowWidth() - texDepth->getWidth() / 2 ), (float)( texDepth->getHeight() / 2 ) );
 		gl::draw( texDepth, texDepth->getBounds(), Rectf( texDepth->getBounds() ) * 0.5f );
+		
 		Surface16u surface = MsKinect::depthChannelToSurface( mFrame.getDepthChannel(), 
 			MsKinect::DepthProcessOptions().enableUserColor().enableRemoveBackground() );
+		
 		gl::TextureRef texUsers = gl::Texture::create( surface );
 		gl::pushMatrices();
 		gl::translate( 0.0f, (float)( texUsers->getHeight() / 2 ) );
@@ -160,6 +166,9 @@ void TestApp::setup()
 	} );
 	mDevice->start();
 
+	mTilt		= mDevice->getTilt();
+	mTiltPrev	= mTilt;
+
 	mFaceTracker = MsKinect::FaceTracker::create();
 	mFaceTracker->enableCalcMesh( false );
 	mFaceTracker->enableCalcMesh2d();
@@ -168,9 +177,10 @@ void TestApp::setup()
 	} );
 	mFaceTracker->start();
 
-	mParams = params::InterfaceGl::create( "PARAMS", Vec2i( 200, 120 ) );
+	mParams = params::InterfaceGl::create( "PARAMS", Vec2i( 200, 140 ) );
 	mParams->addParam( "Frame rate",	&mFrameRate,					"", true );
 	mParams->addParam( "User count",	&mNumUsers,						"", true );
+	mParams->addParam( "Tilt",			&mTilt,							"min=-28 max=28 step=1" );
 	mParams->addParam( "Full screen",	&mFullScreen,					"key=f" );
 	mParams->addButton( "Quit",			bind( &TestApp::quit, this ),	"key=q" );
 }
@@ -182,6 +192,11 @@ void TestApp::update()
 	if ( mFullScreenPrev != mFullScreen ) {
 		setFullScreen( mFullScreen );
 		mFullScreenPrev = mFullScreen;
+	}
+
+	if ( mTiltPrev = mTilt ) {
+		mDevice->setTilt( mTilt );
+		mTiltPrev = mTilt;
 	}
 }
 

@@ -1,0 +1,385 @@
+/*
+* 
+* Copyright (c) 2013, Ban the Rewind
+* All rights reserved.
+* 
+* Redistribution and use in source and binary forms, with or 
+* without modification, are permitted provided that the following 
+* conditions are met:
+* 
+* Redistributions of source code must retain the above copyright 
+* notice, this list of conditions and the following disclaimer.
+* Redistributions in binary form must reproduce the above copyright 
+* notice, this list of conditions and the following disclaimer in 
+* the documentation and/or other materials provided with the 
+* distribution.
+* 
+* Neither the name of the Ban the Rewind nor the names of its 
+* contributors may be used to endorse or promote products 
+* derived from this software without specific prior written 
+* permission.
+* 
+* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 
+* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT 
+* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS 
+* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE 
+* COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, 
+* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; 
+* LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER 
+* CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, 
+* STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
+* ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF 
+* ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+* 
+*/
+
+#include "cinder/app/AppBasic.h"
+#include "cinder/Camera.h"
+#include "cinder/gl/Fbo.h"
+#include "cinder/gl/GlslProg.h"
+#include "cinder/gl/Texture.h"
+#include "cinder/gl/Vbo.h"
+#include "cinder/params/Params.h"
+#include "Kinect.h"
+
+class ParticleApp : public ci::app::AppBasic 
+{
+public:
+	void 						draw();
+	void 						prepareSettings( ci::app::AppBasic::Settings* settings );
+	void						resize();			
+	void 						setup();
+	void						update();
+private:
+	MsKinect::DeviceRef			mDevice;
+	void						onFrame( MsKinect::Frame frame );
+	
+	ci::CameraPersp				mCamera;
+	ci::gl::Fbo					mFboDraw;
+	ci::gl::Fbo					mFboGpGpu;
+	ci::gl::GlslProgRef			mShaderDraw;
+	ci::gl::GlslProgRef			mShaderGpGpu;
+	ci::gl::VboMeshRef			mMesh;
+	ci::gl::TextureRef			mTextureDepth;
+
+	float						mParticleDampen;
+	float						mParticleDepthThreshold;
+	float						mParticleFade;
+	float						mParticleMinDistance;
+	ci::Vec3f					mParticleOrigin;
+	float						mParticleSpeed;
+	float						mParticleTrails;
+	
+	float						mFrameRate;
+	bool						mFullScreen;
+	bool						mFullScreenPrev;
+	ci::params::InterfaceGlRef	mParams;
+};
+
+#include "cinder/ImageIo.h"
+#include "cinder/Rand.h"
+#include "cinder/Utilities.h"
+#include "Resources.h"
+
+using namespace ci;
+using namespace ci::app;
+using namespace std;
+
+void ParticleApp::draw()
+{
+	if ( mTextureDepth ) {
+		
+		////////////////////////////////////////////////////////////////
+		// GPGPU
+
+		int32_t ping	= getElapsedFrames() % 2;
+		int32_t pong	= ( ping + 1 ) % 2;
+		ping			*= 3;
+		pong			*= 3;
+
+		{
+			gl::enableAlphaBlending();
+
+			mFboGpGpu.bindFramebuffer();
+			gl::setViewport( mFboGpGpu.getBounds() );
+			gl::setMatricesWindow( mFboGpGpu.getSize() );
+			const GLenum buffers[ 3 ] = {
+				GL_COLOR_ATTACHMENT0 + pong, 
+				GL_COLOR_ATTACHMENT1 + pong, 
+				GL_COLOR_ATTACHMENT2 + pong
+			};
+			glDrawBuffers( 3, buffers );
+			for ( int32_t i = 0; i < 3; ++i ) {
+				mFboGpGpu.bindTexture( i, i + ping );
+			}
+
+			mTextureDepth->bind( 3 );
+
+			mShaderGpGpu->bind();
+			mShaderGpGpu->uniform( "colors",			2 );
+			mShaderGpGpu->uniform( "dampen",			mParticleDampen );
+			mShaderGpGpu->uniform( "depthThreshold",	mParticleDepthThreshold );
+			mShaderGpGpu->uniform( "destinations",		3 );
+			mShaderGpGpu->uniform( "fade",				mParticleFade );
+			mShaderGpGpu->uniform( "minDistance",		mParticleMinDistance );
+			mShaderGpGpu->uniform( "origin",			mParticleOrigin );
+			mShaderGpGpu->uniform( "positions",			0 );
+			mShaderGpGpu->uniform( "speed",				mParticleSpeed );
+			mShaderGpGpu->uniform( "velocities",		1 );
+		
+			gl::drawSolidRect( mFboGpGpu.getBounds() );
+
+			mShaderGpGpu->unbind();
+			mTextureDepth->unbind();
+			mFboGpGpu.unbindTexture();
+			mFboGpGpu.unbindFramebuffer();
+		}
+
+		////////////////////////////////////////////////////////////////
+		// Draw particles
+
+		{
+			//mFboDraw.bindFramebuffer();
+			//gl::setViewport( mFboDraw.getBounds() );
+			gl::setViewport( getWindowBounds() );
+			gl::setMatrices( mCamera );
+
+			gl::enableAlphaBlending();
+			gl::color( ColorAf( Colorf::black(), 1.0f - mParticleTrails ) );
+			//gl::drawSolidRect( mFboDraw.getBounds() );
+			gl::drawSolidRect( getWindowBounds() );
+
+			gl::enableAdditiveBlending();
+			gl::enableDepthRead();
+			gl::enableDepthWrite();
+			gl::color( ColorAf::white() );
+
+			mFboGpGpu.bindTexture( 0, 0 + pong );
+			mFboGpGpu.bindTexture( 1, 2 + pong );
+
+			mShaderDraw->bind();
+			mShaderDraw->uniform( "colors",		1 );
+			mShaderDraw->uniform( "positions",	0 );
+
+			gl::draw( mMesh );
+
+			mShaderDraw->unbind();
+			mFboGpGpu.unbindTexture();
+			mFboDraw.unbindFramebuffer();
+
+			//gl::disableAlphaBlending();
+			//gl::disableDepthRead();
+			//gl::disableDepthWrite();
+
+			//gl::setViewport( getWindowBounds() );
+			//gl::setMatricesWindow( getWindowSize() );
+			//gl::color( ColorAf::white() );
+			//mFboDraw.bindTexture();
+			//gl::drawSolidRect( getWindowBounds() );
+		}
+
+		////////////////////////////////////////////////////////////////
+		// Draw params, debug info
+
+		{
+			gl::setViewport( getWindowBounds() );
+			gl::setMatricesWindow( getWindowSize() );
+			gl::clear();
+			gl::disableAlphaBlending();
+			gl::color( ColorAf::white() );
+			
+			float x = (float)( getWindowWidth() - mTextureDepth->getWidth() / 4 );
+			float y = 0.0f;
+
+			gl::pushMatrices();
+			gl::translate( x, y );
+			gl::draw( mTextureDepth, mTextureDepth->getBounds(), Rectf( mTextureDepth->getBounds() ) * 0.25f );
+			gl::popMatrices();
+			y += (float)( mTextureDepth->getHeight() / 4 );
+
+			for ( int32_t i = 0; i < 6; ++i ) {
+				gl::pushMatrices();
+				gl::translate( x, y );
+				gl::draw( mFboGpGpu.getTexture( i ), mFboGpGpu.getTexture( i ).getBounds(), Rectf( mFboGpGpu.getTexture( i ).getBounds() ) * 0.25f );
+				gl::popMatrices();
+				y += (float)( mFboGpGpu.getTexture( i ).getHeight() / 4 );
+			}
+		}
+	}
+	
+	mParams->draw();
+}
+
+void ParticleApp::onFrame( MsKinect::Frame frame )
+{
+	if ( frame.getDepthChannel() ) {
+		Channel32f depth = Channel32f( frame.getDepthChannel() );
+		if ( mTextureDepth ) {
+			mTextureDepth->update( depth );
+		} else {
+			mTextureDepth = gl::Texture::create( depth );
+		}
+	}
+}
+
+void ParticleApp::prepareSettings( Settings* settings )
+{
+	settings->setFrameRate( 60.0f );
+	settings->setFullScreen( true );
+	settings->setWindowSize( 1280, 720 );
+}
+
+void ParticleApp::resize()
+{
+	gl::enable( GL_TEXTURE_2D );
+
+	mCamera = CameraPersp( getWindowWidth(), getWindowHeight(), 60.0f, 1.0f, 100.0f );
+	mCamera.lookAt( Vec3f( 0.0f, 0.0f, 5.0f ), Vec3f::zero() );
+	
+	//gl::Fbo::Format format;
+	//format.setSamples( 4 );
+	//format.setColorInternalFormat( GL_RGBA32F );
+
+	//mFboDraw = gl::Fbo( getWindowWidth(), getWindowHeight(), format );
+	//mFboDraw.bindFramebuffer();
+	//gl::setViewport( mFboDraw.getBounds() );
+	//gl::clear();
+	//mFboDraw.unbindFramebuffer();
+}
+
+void ParticleApp::setup()
+{
+	////////////////////////////////////////////////////////////////
+	// Load shaders
+
+	try {
+		mShaderDraw = gl::GlslProg::create( loadResource( RES_GLSL_DRAW_VERT ), loadResource( RES_GLSL_DRAW_FRAG ) );
+	} catch ( gl::GlslProgCompileExc ex ) {
+		console() << "Unable to load draw shader: " << ex.what() << endl;
+		quit();
+		return;
+	}
+
+	try {
+		mShaderGpGpu = gl::GlslProg::create( loadResource( RES_GLSL_GPGPU_VERT ), loadResource( RES_GLSL_GPGPU_FRAG ) );
+	} catch ( gl::GlslProgCompileExc ex ) {
+		console() << "Unable to load GPGPU shader: " << ex.what() << endl;
+		quit();
+		return;
+	}
+
+	////////////////////////////////////////////////////////////////
+	// Define properties
+	mFrameRate					= 0.0f;
+	mFullScreen					= isFullScreen();
+	mFullScreenPrev				= mFullScreen;
+	mParticleDampen				= 1.0f;
+	mParticleDepthThreshold		= 0.9f;
+	mParticleFade				= 0.1f;
+	mParticleMinDistance		= 0.001f;
+	mParticleOrigin				= Vec3f::zero();
+	mParticleSpeed				= 0.021f;
+	mParticleTrails				= 0.0f;
+
+	////////////////////////////////////////////////////////////////
+	// Set up Kinect
+
+	MsKinect::DeviceOptions deviceOptions;
+	deviceOptions.enableColor( false );
+	deviceOptions.enableUserTracking( false );
+	deviceOptions.setDepthResolution( MsKinect::ImageResolution::NUI_IMAGE_RESOLUTION_640x480 );
+	mDevice = MsKinect::Device::create();
+	mDevice->connectEventHandler( &ParticleApp::onFrame, this );
+	mDevice->start( deviceOptions );
+
+	////////////////////////////////////////////////////////////////
+	// Set up particles
+
+	glPointSize( 1.0f );
+
+	gl::Fbo::Format format;
+	format.enableColorBuffer( true, 6 );
+	format.setColorInternalFormat( GL_RGBA32F );
+
+	mFboGpGpu = gl::Fbo( deviceOptions.getDepthSize().x, deviceOptions.getDepthSize().y, format );
+	mFboGpGpu.bindFramebuffer();
+	gl::setViewport( mFboGpGpu.getBounds() );
+	gl::setMatricesWindow( mFboGpGpu.getSize() );
+
+	const GLenum positionBuffers[ 2 ] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT0 + 3 };
+	glDrawBuffers( 2, positionBuffers );
+	gl::clear( Colorf( ColorModel::CM_RGB, mParticleOrigin ) );
+
+	const GLenum velocityBuffers[ 2 ] = { GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT1 + 3 };
+	glDrawBuffers( 2, velocityBuffers );
+	gl::clear();
+
+	const GLenum colorBuffers[ 2 ] = { GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT2 + 3 };
+	glDrawBuffers( 2, colorBuffers );
+	gl::begin( GL_POINTS );
+	for ( int32_t x = 0; x < mFboGpGpu.getWidth(); ++x ) {
+		for ( int32_t y = 0; y < mFboGpGpu.getHeight(); ++y ) {
+			Vec3f v = randVec3f();
+			gl::color( Colorf( abs( v.x ), abs( v.y ), abs( v.z ) ) );
+			gl::vertex( (float)x, (float)y );
+		}
+	}
+	gl::end();
+
+	mFboGpGpu.unbindFramebuffer();
+
+	vector<uint32_t> indices;
+	vector<Vec3f> positions;
+	vector<Vec2f> texCoords;
+	uint32_t i = 0;
+	for ( int32_t x = 0; x < mFboGpGpu.getWidth(); ++x ) {
+		for ( int32_t y = 0; y < mFboGpGpu.getHeight(); ++y, ++i ) {
+			float u = (float)x / (float)mFboGpGpu.getWidth();
+			float v = (float)y / (float)mFboGpGpu.getHeight();
+			indices.push_back( i );
+			positions.push_back( Vec3f::zero() );
+			texCoords.push_back( Vec2f( u, v ) );
+		}
+	}
+	gl::VboMesh::Layout layout;
+	layout.setStaticIndices();
+	layout.setStaticPositions();
+	layout.setStaticTexCoords2d();
+
+	mMesh = gl::VboMesh::create( positions.size(), indices.size(), layout, GL_POINTS );
+	mMesh->bufferIndices( indices );
+	mMesh->bufferPositions( positions );
+	mMesh->bufferTexCoords2d( 0, texCoords );
+	mMesh->unbindBuffers();
+
+	////////////////////////////////////////////////////////////////
+	// Set up parameters
+
+	mParams = params::InterfaceGl::create( "PARAMS", Vec2i( 200, 400 ) );
+	mParams->addParam( "Frame rate",			&mFrameRate,						"", true );
+	mParams->addParam( "Full screen",			&mFullScreen,						"key=f" );
+	mParams->addButton( "Quit",					bind( &ParticleApp::quit, this ),	"key=q" );
+	mParams->addSeparator( "" );
+	mParams->addParam( "Particle dampen",		&mParticleDampen,					"min=0.0 max=1.0 step=0.0001" );
+	mParams->addParam( "Particle depth thrsh",	&mParticleDepthThreshold,			"min=0.0 max=1.0 step=0.001" );
+	mParams->addParam( "Particle fade",			&mParticleFade,						"min=0.0 max=100.0 step=0.0001" );
+	mParams->addParam( "Particle min dist",		&mParticleMinDistance,				"min=0.0 max=1.0 step=0.00001" );
+	mParams->addParam( "Particle origin",		&mParticleOrigin );
+	mParams->addParam( "Particle speed",		&mParticleSpeed,					"min=-10.0 max=10.0 step=0.001" );
+	mParams->addParam( "Particle trails",		&mParticleTrails,					"min=0.0 max=1.0 step=0.000001" );
+
+	resize();
+}
+
+void ParticleApp::update()
+{
+	mFrameRate = getAverageFps();
+
+	if ( mFullScreenPrev != mFullScreen ) {
+		setFullScreen( mFullScreen );
+		mFullScreenPrev = mFullScreen;
+	}
+}
+
+CINDER_APP_BASIC( ParticleApp, RendererGl )
