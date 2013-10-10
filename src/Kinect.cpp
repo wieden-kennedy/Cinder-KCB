@@ -789,7 +789,6 @@ void Device::start( const DeviceOptions& deviceOptions )
 
 		KINECT_SENSOR_STATUS status = KinectGetKinectSensorStatus( mKinect );
 		statusKinect( status );
-
 		if ( status > 1 ) {
 			return;
 		}
@@ -798,7 +797,7 @@ void Device::start( const DeviceOptions& deviceOptions )
 			KINECT_IMAGE_FRAME_FORMAT format	= { sizeof( KINECT_IMAGE_FRAME_FORMAT ), 0 };
 			mFormatColor						= format;
 			KinectEnableColorStream( mKinect, mDeviceOptions.getColorResolution(), &mFormatColor );
-            if ( KinectStreamStatusError != KinectGetColorStreamStatus(mKinect) ) {
+            if ( KinectGetColorStreamStatus( mKinect ) != KINECT_STREAM_STATUS::KinectStreamStatusError ) {
 				mBufferColor					= new uint8_t[ mFormatColor.cbBufferSize ];
 			} else {
 				mDeviceOptions.enableColor( false );
@@ -811,7 +810,7 @@ void Device::start( const DeviceOptions& deviceOptions )
 			KINECT_IMAGE_FRAME_FORMAT format	= { sizeof( KINECT_IMAGE_FRAME_FORMAT ), 0 };
 			mFormatDepth						= format;
 			KinectEnableDepthStream( mKinect, mDeviceOptions.isNearModeEnabled(), mDeviceOptions.getDepthResolution(), &mFormatDepth );
-            if ( KinectStreamStatusError != KinectGetDepthStreamStatus(mKinect) ) {
+            if ( KinectGetDepthStreamStatus( mKinect ) != KINECT_STREAM_STATUS::KinectStreamStatusError ) {
 				mBufferDepth					= new uint8_t[ mFormatDepth.cbBufferSize ];
 			} else {
 				mDeviceOptions.enableDepth( false );
@@ -824,7 +823,7 @@ void Device::start( const DeviceOptions& deviceOptions )
 			KINECT_IMAGE_FRAME_FORMAT format	= { sizeof( KINECT_IMAGE_FRAME_FORMAT ), 0 };
 			mFormatInfrared						= format;
 			KinectEnableIRStream( mKinect, mDeviceOptions.getInfraredResolution(), &mFormatInfrared );
-            if ( KinectStreamStatusError != KinectGetIRStreamStatus(mKinect) ) {
+            if ( KinectGetIRStreamStatus( mKinect ) != KINECT_STREAM_STATUS::KinectStreamStatusError ) {
 				mBufferInfrared					= new uint8_t[ mFormatInfrared.cbBufferSize ];
 			} else {
 				mDeviceOptions.enableInfrared( false );
@@ -836,7 +835,7 @@ void Device::start( const DeviceOptions& deviceOptions )
 		if ( mDeviceOptions.isUserTrackingEnabled() ) {
 			KinectEnableSkeletonStream( mKinect, mDeviceOptions.isSeatedModeEnabled(), 
 				mDeviceOptions.getSkeletonSelectionMode(), &kTransformParams[ mDeviceOptions.getSkeletonTransform() ] );
-			if ( KinectStreamStatusError != KinectGetSkeletonStreamStatus(mKinect) ) {
+			if ( KinectGetSkeletonStreamStatus( mKinect ) != KINECT_STREAM_STATUS::KinectStreamStatusError ) {
 				mIsSkeletonDevice = true;
 			} else {
 				mDeviceOptions.enableUserTracking( false );
@@ -850,13 +849,12 @@ void Device::start( const DeviceOptions& deviceOptions )
 			mSkeletons.push_back( Skeleton() );
 		}
 
-        hr = KinectStartStreams(mKinect);
-        if ( FAILED(hr) )
-        {
-            mCapture = false;
+		hr = KinectStartStreams( mKinect );
+		if ( FAILED( hr ) ) {
+			mCapture = false;
 			console() << "Unable to start the streams: ";
 			errorNui( hr );
-        }
+		}
 
 		mCapture = true;
 	}

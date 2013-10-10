@@ -60,7 +60,7 @@ private:
 	ci::gl::GlslProgRef			mShaderDraw;
 	ci::gl::GlslProgRef			mShaderGpGpu;
 	ci::gl::VboMeshRef			mMesh;
-	ci::gl::TextureRef			mTextureDepth;
+	ci::gl::TextureRef			mTextureInfrared;
 
 	float						mParticleDampen;
 	ci::Vec3f					mParticleCenter;
@@ -84,7 +84,7 @@ using namespace std;
 
 void ParticleApp::draw()
 {
-	if ( mTextureDepth ) {
+	if ( mTextureInfrared ) {
 		
 		////////////////////////////////////////////////////////////////
 		// GPGPU
@@ -106,7 +106,7 @@ void ParticleApp::draw()
 			for ( int32_t i = 0; i < 2; ++i ) {
 				mFboGpGpu.bindTexture( i, i + ping );
 			}
-			mTextureDepth->bind( 2 );
+			mTextureInfrared->bind( 2 );
 			
 			mShaderGpGpu->bind();
 			mShaderGpGpu->uniform( "center",		mParticleCenter );
@@ -119,7 +119,7 @@ void ParticleApp::draw()
 			gl::drawSolidRect( mFboGpGpu.getBounds(), true );
 			
 			mShaderGpGpu->unbind();
-			mTextureDepth->unbind();
+			mTextureInfrared->unbind();
 			mFboGpGpu.unbindTexture();
 			mFboGpGpu.unbindFramebuffer();
 		}
@@ -162,14 +162,14 @@ void ParticleApp::draw()
 			gl::enable( GL_TEXTURE_2D );
 			gl::color( ColorAf::white() );
 			
-			float x = (float)( getWindowWidth() - mTextureDepth->getWidth() / 4 );
+			float x = (float)( getWindowWidth() - mTextureInfrared->getWidth() / 4 );
 			float y = 0.0f;
 
 			gl::pushMatrices();
 			gl::translate( x, y );
-			gl::draw( mTextureDepth, mTextureDepth->getBounds(), Rectf( mTextureDepth->getBounds() ) * 0.25f );
+			gl::draw( mTextureInfrared, mTextureInfrared->getBounds(), Rectf( mTextureInfrared->getBounds() ) * 0.25f );
 			gl::popMatrices();
-			y += (float)( mTextureDepth->getHeight() / 4 );
+			y += (float)( mTextureInfrared->getHeight() / 4 );
 
 			for ( int32_t i = 0; i < 4; ++i ) {
 				gl::pushMatrices();
@@ -187,12 +187,12 @@ void ParticleApp::draw()
 
 void ParticleApp::onFrame( MsKinect::Frame frame )
 {
-	if ( frame.getDepthChannel() ) {
-		Channel32f depth( frame.getDepthChannel() );
-		if ( mTextureDepth ) {
-			mTextureDepth->update( depth );
+	if ( frame.getInfraredChannel() ) {
+		Channel32f ir( frame.getInfraredChannel() );
+		if ( mTextureInfrared ) {
+			mTextureInfrared->update( ir );
 		} else {
-			mTextureDepth = gl::Texture::create( depth );
+			mTextureInfrared = gl::Texture::create( ir );
 		}
 	}
 }
@@ -247,9 +247,9 @@ void ParticleApp::setup()
 	// Set up Kinect
 
 	MsKinect::DeviceOptions deviceOptions;
-	deviceOptions.enableColor( false );
+	deviceOptions.enableInfrared( true );
 	deviceOptions.enableUserTracking( false );
-	deviceOptions.setDepthResolution( MsKinect::ImageResolution::NUI_IMAGE_RESOLUTION_640x480 );
+	deviceOptions.setInfraredResolution( MsKinect::ImageResolution::NUI_IMAGE_RESOLUTION_640x480 );
 	mDevice = MsKinect::Device::create();
 	mDevice->connectEventHandler( &ParticleApp::onFrame, this );
 	mDevice->start( deviceOptions );
@@ -263,7 +263,7 @@ void ParticleApp::setup()
 	format.enableColorBuffer( true, 4 );
 	format.setColorInternalFormat( GL_RGBA32F );
 
-	mFboGpGpu = gl::Fbo( deviceOptions.getDepthSize().x, deviceOptions.getDepthSize().y, format );
+	mFboGpGpu = gl::Fbo( deviceOptions.getInfraredSize().x, deviceOptions.getInfraredSize().y, format );
 	mFboGpGpu.bindFramebuffer();
 	gl::setViewport( mFboGpGpu.getBounds() );
 	gl::setMatricesWindow( mFboGpGpu.getSize() );
