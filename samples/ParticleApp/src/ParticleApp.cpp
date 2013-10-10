@@ -56,7 +56,7 @@ private:
 	void						onFrame( MsKinect::Frame frame );
 	
 	ci::CameraPersp				mCamera;
-	ci::gl::Fbo					mFboDraw;
+	ci::gl::Fbo					mFboKinect;
 	ci::gl::Fbo					mFboGpGpu;
 	ci::gl::GlslProgRef			mShaderDraw;
 	ci::gl::GlslProgRef			mShaderGpGpu;
@@ -64,10 +64,7 @@ private:
 	ci::gl::TextureRef			mTextureDepth;
 
 	float						mParticleDampen;
-	float						mParticleDepthThreshold;
-	float						mParticleFade;
-	float						mParticleMinDistance;
-	ci::Vec3f					mParticleOrigin;
+	ci::Vec3f					mParticleCenter;
 	float						mParticleSpeed;
 	float						mParticleTrails;
 	
@@ -95,8 +92,8 @@ void ParticleApp::draw()
 
 		int32_t ping	= getElapsedFrames() % 2;
 		int32_t pong	= ( ping + 1 ) % 2;
-		ping			*= 3;
-		pong			*= 3;
+		ping			*= 2;
+		pong			*= 2;
 
 		{
 			gl::enableAlphaBlending();
@@ -104,26 +101,21 @@ void ParticleApp::draw()
 			mFboGpGpu.bindFramebuffer();
 			gl::setViewport( mFboGpGpu.getBounds() );
 			gl::setMatricesWindow( mFboGpGpu.getSize() );
-			const GLenum buffers[ 3 ] = {
+			const GLenum buffers[ 2 ] = {
 				GL_COLOR_ATTACHMENT0 + pong, 
-				GL_COLOR_ATTACHMENT1 + pong, 
-				GL_COLOR_ATTACHMENT2 + pong
+				GL_COLOR_ATTACHMENT1 + pong
 			};
-			glDrawBuffers( 3, buffers );
-			for ( int32_t i = 0; i < 3; ++i ) {
+			glDrawBuffers( 2, buffers );
+			for ( int32_t i = 0; i < 2; ++i ) {
 				mFboGpGpu.bindTexture( i, i + ping );
 			}
 
-			mTextureDepth->bind( 3 );
+			mTextureDepth->bind( 2 );
 
 			mShaderGpGpu->bind();
-			mShaderGpGpu->uniform( "colors",			2 );
+			mShaderGpGpu->uniform( "center",			mParticleCenter );
 			mShaderGpGpu->uniform( "dampen",			mParticleDampen );
-			mShaderGpGpu->uniform( "depthThreshold",	mParticleDepthThreshold );
-			mShaderGpGpu->uniform( "destinations",		3 );
-			mShaderGpGpu->uniform( "fade",				mParticleFade );
-			mShaderGpGpu->uniform( "minDistance",		mParticleMinDistance );
-			mShaderGpGpu->uniform( "origin",			mParticleOrigin );
+			mShaderGpGpu->uniform( "kinect",			2 );
 			mShaderGpGpu->uniform( "positions",			0 );
 			mShaderGpGpu->uniform( "speed",				mParticleSpeed );
 			mShaderGpGpu->uniform( "velocities",		1 );
@@ -140,14 +132,11 @@ void ParticleApp::draw()
 		// Draw particles
 
 		{
-			//mFboDraw.bindFramebuffer();
-			//gl::setViewport( mFboDraw.getBounds() );
 			gl::setViewport( getWindowBounds() );
 			gl::setMatrices( mCamera );
 
 			gl::enableAlphaBlending();
 			gl::color( ColorAf( Colorf::black(), 1.0f - mParticleTrails ) );
-			//gl::drawSolidRect( mFboDraw.getBounds() );
 			gl::drawSolidRect( getWindowBounds() );
 
 			gl::enableAdditiveBlending();
@@ -156,27 +145,14 @@ void ParticleApp::draw()
 			gl::color( ColorAf::white() );
 
 			mFboGpGpu.bindTexture( 0, 0 + pong );
-			mFboGpGpu.bindTexture( 1, 2 + pong );
 
 			mShaderDraw->bind();
-			mShaderDraw->uniform( "colors",		1 );
 			mShaderDraw->uniform( "positions",	0 );
 
 			gl::draw( mMesh );
 
 			mShaderDraw->unbind();
 			mFboGpGpu.unbindTexture();
-			mFboDraw.unbindFramebuffer();
-
-			//gl::disableAlphaBlending();
-			//gl::disableDepthRead();
-			//gl::disableDepthWrite();
-
-			//gl::setViewport( getWindowBounds() );
-			//gl::setMatricesWindow( getWindowSize() );
-			//gl::color( ColorAf::white() );
-			//mFboDraw.bindTexture();
-			//gl::drawSolidRect( getWindowBounds() );
 		}
 
 		////////////////////////////////////////////////////////////////
@@ -198,7 +174,7 @@ void ParticleApp::draw()
 			gl::popMatrices();
 			y += (float)( mTextureDepth->getHeight() / 4 );
 
-			for ( int32_t i = 0; i < 6; ++i ) {
+			for ( int32_t i = 0; i < 4; ++i ) {
 				gl::pushMatrices();
 				gl::translate( x, y );
 				gl::draw( mFboGpGpu.getTexture( i ), mFboGpGpu.getTexture( i ).getBounds(), Rectf( mFboGpGpu.getTexture( i ).getBounds() ) * 0.25f );
@@ -236,16 +212,6 @@ void ParticleApp::resize()
 
 	mCamera = CameraPersp( getWindowWidth(), getWindowHeight(), 60.0f, 1.0f, 100.0f );
 	mCamera.lookAt( Vec3f( 0.0f, 0.0f, 5.0f ), Vec3f::zero() );
-	
-	//gl::Fbo::Format format;
-	//format.setSamples( 4 );
-	//format.setColorInternalFormat( GL_RGBA32F );
-
-	//mFboDraw = gl::Fbo( getWindowWidth(), getWindowHeight(), format );
-	//mFboDraw.bindFramebuffer();
-	//gl::setViewport( mFboDraw.getBounds() );
-	//gl::clear();
-	//mFboDraw.unbindFramebuffer();
 }
 
 void ParticleApp::setup()
@@ -275,10 +241,7 @@ void ParticleApp::setup()
 	mFullScreen					= isFullScreen();
 	mFullScreenPrev				= mFullScreen;
 	mParticleDampen				= 1.0f;
-	mParticleDepthThreshold		= 0.9f;
-	mParticleFade				= 0.1f;
-	mParticleMinDistance		= 0.001f;
-	mParticleOrigin				= Vec3f::zero();
+	mParticleCenter				= Vec3f::zero();
 	mParticleSpeed				= 0.021f;
 	mParticleTrails				= 0.0f;
 
@@ -299,7 +262,7 @@ void ParticleApp::setup()
 	glPointSize( 1.0f );
 
 	gl::Fbo::Format format;
-	format.enableColorBuffer( true, 6 );
+	format.enableColorBuffer( true, 4 );
 	format.setColorInternalFormat( GL_RGBA32F );
 
 	mFboGpGpu = gl::Fbo( deviceOptions.getDepthSize().x, deviceOptions.getDepthSize().y, format );
@@ -307,25 +270,13 @@ void ParticleApp::setup()
 	gl::setViewport( mFboGpGpu.getBounds() );
 	gl::setMatricesWindow( mFboGpGpu.getSize() );
 
-	const GLenum positionBuffers[ 2 ] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT0 + 3 };
+	const GLenum positionBuffers[ 2 ] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT0 + 2 };
 	glDrawBuffers( 2, positionBuffers );
-	gl::clear( Colorf( ColorModel::CM_RGB, mParticleOrigin ) );
+	gl::clear( Colorf( ColorModel::CM_RGB, mParticleCenter ) );
 
-	const GLenum velocityBuffers[ 2 ] = { GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT1 + 3 };
+	const GLenum velocityBuffers[ 2 ] = { GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT1 + 2 };
 	glDrawBuffers( 2, velocityBuffers );
 	gl::clear();
-
-	const GLenum colorBuffers[ 2 ] = { GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT2 + 3 };
-	glDrawBuffers( 2, colorBuffers );
-	gl::begin( GL_POINTS );
-	for ( int32_t x = 0; x < mFboGpGpu.getWidth(); ++x ) {
-		for ( int32_t y = 0; y < mFboGpGpu.getHeight(); ++y ) {
-			Vec3f v = randVec3f();
-			gl::color( Colorf( abs( v.x ), abs( v.y ), abs( v.z ) ) );
-			gl::vertex( (float)x, (float)y );
-		}
-	}
-	gl::end();
 
 	mFboGpGpu.unbindFramebuffer();
 
@@ -362,10 +313,7 @@ void ParticleApp::setup()
 	mParams->addButton( "Quit",					bind( &ParticleApp::quit, this ),	"key=q" );
 	mParams->addSeparator( "" );
 	mParams->addParam( "Particle dampen",		&mParticleDampen,					"min=0.0 max=1.0 step=0.0001" );
-	mParams->addParam( "Particle depth thrsh",	&mParticleDepthThreshold,			"min=0.0 max=1.0 step=0.001" );
-	mParams->addParam( "Particle fade",			&mParticleFade,						"min=0.0 max=100.0 step=0.0001" );
-	mParams->addParam( "Particle min dist",		&mParticleMinDistance,				"min=0.0 max=1.0 step=0.00001" );
-	mParams->addParam( "Particle origin",		&mParticleOrigin );
+	mParams->addParam( "Particle origin",		&mParticleCenter );
 	mParams->addParam( "Particle speed",		&mParticleSpeed,					"min=-10.0 max=10.0 step=0.001" );
 	mParams->addParam( "Particle trails",		&mParticleTrails,					"min=0.0 max=1.0 step=0.000001" );
 

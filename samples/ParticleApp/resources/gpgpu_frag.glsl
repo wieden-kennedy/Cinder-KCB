@@ -1,59 +1,32 @@
 uniform sampler2D	colors;
-uniform float		dampen;
-uniform float		depthThreshold;
-uniform sampler2D	destinations;	// Kinect image
-uniform float		fade;
-uniform float		minDistance;
-uniform vec3		origin;
+uniform sampler2D	kinect;
 uniform sampler2D	positions;
-uniform float		speed;
 uniform sampler2D	velocities;
+
+uniform float		dampen;
+uniform vec3		center;
+uniform float		speed;
 
 varying vec2		uv;
 
-float rand( vec2 co )
-{
-	return fract( sin( dot( co.xy, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
-}
-
 void main ( void )
 {
-	// Look up position in destination in Kinect image
-	float depth					= texture2D( destinations,	uv ).r;
-	vec3 destination			= vec3( uv, depth );
-	if ( destination.z >= depthThreshold ) {
-		destination				= origin;
-	}
-
-	// Get current color, position, and velocity
-	vec4 color					= texture2D( colors,		uv );
-	vec3 position				= texture2D( positions,		uv ).rgb;
-	vec3 velocity				= texture2D( velocities,	uv ).rgb;
+	vec3 destination;
+	destination.x		= uv.s;
+	destination.y		= uv.t;
+	destination.z		= 1.0 - texture2D( kinect,		uv ).r;
+	vec3 position		= texture2D( positions,		uv ).rgb;
+	vec3 velocity		= texture2D( velocities,	uv ).rgb;
 	
-	// Update velocity and position
-	/*vec3 direction				= destination - position;
-	float distanceToDestination	= length( direction );
-	if ( distanceToDestination <= minDistance ) {
-		vec4 newColor;
-		newColor.r				= rand( color.rg );
-		newColor.g				= rand( color.gb );
-		newColor.b				= rand( color.rb );
-		newColor.a				= 1.0;
-		color					= newColor;
-		position				= origin;
-		velocity				= vec3( 0.0 );
-	}
-	velocity					+= direction * speed;
-	position					+= velocity;
-	velocity					*= dampen;
+	velocity			+= normalize( destination - position ) * speed;
+	velocity			+= normalize( center - position ) * speed * 0.5;
 
-	// Set alpha using distance from origin
-	float distanceToOrigin		= length( origin - position );
-	color.a						= min( distanceToOrigin * fade, 1.0 );*/
+	position			+= velocity;
+	velocity			*= dampen;
 
-	// Update data
-	gl_FragData[ 0 ]			= vec4( position, 1.0 );
-	gl_FragData[ 1 ]			= vec4( velocity, 1.0 );
-	gl_FragData[ 2 ]			= color;
+	position			= destination;
+
+	gl_FragData[ 0 ]	= vec4( position, 1.0 );
+	gl_FragData[ 1 ]	= vec4( velocity, 1.0 );
 }
  
