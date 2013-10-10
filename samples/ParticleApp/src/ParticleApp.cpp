@@ -56,7 +56,7 @@ private:
 	void						onFrame( MsKinect::Frame frame );
 	
 	ci::CameraPersp				mCamera;
-	ci::gl::Fbo					mFboGpGpu;
+	ci::gl::Fbo					mFbo[ 2 ];
 	ci::gl::GlslProgRef			mShaderDraw;
 	ci::gl::GlslProgRef			mShaderGpGpu;
 	ci::gl::VboMeshRef			mMesh;
@@ -91,20 +91,18 @@ void ParticleApp::draw()
 
 		int32_t ping	= getElapsedFrames() % 2;
 		int32_t pong	= ( ping + 1 ) % 2;
-		ping			*= 2;
-		pong			*= 2;
 		gl::enable( GL_TEXTURE_2D );
 		{
-			mFboGpGpu.bindFramebuffer();
+			mFbo[ pong ].bindFramebuffer();
 			const GLenum buffers[ 2 ] = {
-				GL_COLOR_ATTACHMENT0 + pong, 
-				GL_COLOR_ATTACHMENT1 + pong
+				GL_COLOR_ATTACHMENT0, 
+				GL_COLOR_ATTACHMENT1
 			};
 			glDrawBuffers( 2, buffers );
-			gl::setViewport( mFboGpGpu.getBounds() );
-			gl::setMatricesWindow( mFboGpGpu.getSize(), false );
+			gl::setViewport( mFbo[ pong ].getBounds() );
+			gl::setMatricesWindow( mFbo[ pong ].getSize(), false );
 			for ( int32_t i = 0; i < 2; ++i ) {
-				mFboGpGpu.bindTexture( i, i + ping );
+				mFbo[ ping ].bindTexture( i, i );
 			}
 			mTextureDepth->bind( 2 );
 			
@@ -116,12 +114,12 @@ void ParticleApp::draw()
 			mShaderGpGpu->uniform( "speed",			mParticleSpeed );
 			mShaderGpGpu->uniform( "velocities",	1 );
 		
-			gl::drawSolidRect( mFboGpGpu.getBounds(), true );
+			gl::drawSolidRect( mFbo[ pong ].getBounds(), false );
 			
 			mShaderGpGpu->unbind();
 			mTextureDepth->unbind();
-			mFboGpGpu.unbindTexture();
-			mFboGpGpu.unbindFramebuffer();
+			mFbo[ ping ].unbindTexture();
+			mFbo[ pong ].unbindFramebuffer();
 		}
 		gl::disable( GL_TEXTURE_2D );
 
@@ -142,7 +140,7 @@ void ParticleApp::draw()
 			gl::enableDepthWrite();
 			gl::color( ColorAf::white() );
 
-			mFboGpGpu.bindTexture();
+			mFbo[ pong ].bindTexture();
 
 			mShaderDraw->bind();
 			mShaderDraw->uniform( "positions", 0 );
@@ -150,7 +148,11 @@ void ParticleApp::draw()
 			gl::draw( mMesh );
 
 			mShaderDraw->unbind();
-			mFboGpGpu.unbindTexture();
+			mFbo[ pong ].unbindTexture();
+			
+			gl::disableDepthRead();
+			gl::disableDepthWrite();
+			gl::disableAlphaBlending();
 		}
 
 		////////////////////////////////////////////////////////////////
@@ -158,7 +160,6 @@ void ParticleApp::draw()
 
 		{
 			gl::setMatricesWindow( getWindowSize() );
-			gl::disableAlphaBlending();
 			gl::enable( GL_TEXTURE_2D );
 			gl::color( ColorAf::white() );
 			
@@ -171,12 +172,15 @@ void ParticleApp::draw()
 			gl::popMatrices();
 			y += (float)( mTextureDepth->getHeight() / 4 );
 
-			for ( int32_t i = 0; i < 4; ++i ) {
-				gl::pushMatrices();
-				gl::translate( x, y );
-				gl::draw( mFboGpGpu.getTexture( i ), mFboGpGpu.getTexture( i ).getBounds(), Rectf( mFboGpGpu.getTexture( i ).getBounds() ) * 0.25f );
-				gl::popMatrices();
-				y += (float)( mFboGpGpu.getTexture( i ).getHeight() / 4 );
+			for ( int32_t i = 0; i < 2; ++i ) {
+				for ( int32_t j = 0; j < 2; ++j ) {
+					gl::pushMatrices();
+					gl::translate( x, y );
+					const gl::Texture& tex = mFbo[ i ].getTexture( j );
+					gl::draw( tex, tex.getBounds(), Rectf( tex.getBounds() ) * 0.25f );
+					gl::popMatrices();
+					y += (float)( tex.getHeight() / 4 );
+				}
 			}
 			gl::disable( GL_TEXTURE_2D );
 		}
@@ -188,12 +192,9 @@ void ParticleApp::draw()
 void ParticleApp::onFrame( MsKinect::Frame frame )
 {
 	if ( frame.getDepthChannel() ) {
-		Channel32f depth( frame.getDepthChannel() );
-		if ( mTextureDepth ) {
-			mTextureDepth->update( depth );
-		} else {
-			mTextureDepth = gl::Texture::create( depth );
-		}
+		//Surface16u depth	= MsKinect::depthChannelToSurface( frame.getDepthChannel(), MsKinect::DepthProcessOptions().enableRemoveBackground() );
+		//Surface16u depth	= MsKinect::depthChannelToSurface( frame.getDepthChannel() );
+		mTextureDepth		= gl::Texture::create( frame.getDepthChannel() );
 	}
 }
 
@@ -263,29 +264,26 @@ void ParticleApp::setup()
 	format.enableColorBuffer( true, 4 );
 	format.setColorInternalFormat( GL_RGBA32F );
 
-	mFboGpGpu = gl::Fbo( deviceOptions.getDepthSize().x, deviceOptions.getDepthSize().y, format );
-	mFboGpGpu.bindFramebuffer();
-	gl::setViewport( mFboGpGpu.getBounds() );
-	gl::setMatricesWindow( mFboGpGpu.getSize() );
-
-	const GLenum positionBuffers[ 2 ] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT0 + 2 };
-	glDrawBuffers( 2, positionBuffers );
-	gl::clear( Colorf( ColorModel::CM_RGB, mParticleCenter ) );
-
-	const GLenum velocityBuffers[ 2 ] = { GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT1 + 2 };
-	glDrawBuffers( 2, velocityBuffers );
-	gl::clear();
-
-	mFboGpGpu.unbindFramebuffer();
+	for ( size_t i = 0; i < 2; ++i ) {
+		mFbo[ i ] = gl::Fbo( deviceOptions.getDepthSize().x, deviceOptions.getDepthSize().y, format );
+		mFbo[ i ].bindFramebuffer();
+		gl::setViewport( mFbo[ i ].getBounds() );
+		gl::setMatricesWindow( mFbo[ i ].getSize() );
+		glDrawBuffer( GL_COLOR_ATTACHMENT0 );
+		gl::clear( Colorf( ColorModel::CM_RGB, mParticleCenter ) );
+		glDrawBuffer( GL_COLOR_ATTACHMENT1 );
+		gl::clear();
+		mFbo[ i ].unbindFramebuffer();
+	}
 
 	vector<uint32_t> indices;
 	vector<Vec3f> positions;
 	vector<Vec2f> texCoords;
 	uint32_t i = 0;
-	for ( int32_t x = 0; x < mFboGpGpu.getWidth(); ++x ) {
-		for ( int32_t y = 0; y < mFboGpGpu.getHeight(); ++y, ++i ) {
-			float u = (float)x / (float)mFboGpGpu.getWidth();
-			float v = (float)y / (float)mFboGpGpu.getHeight();
+	for ( int32_t x = 0; x < mFbo[ 0 ].getWidth(); ++x ) {
+		for ( int32_t y = 0; y < mFbo[ 0 ].getHeight(); ++y, ++i ) {
+			float u = (float)x / (float)mFbo[ 0 ].getWidth();
+			float v = (float)y / (float)mFbo[ 0 ].getHeight();
 			indices.push_back( i );
 			positions.push_back( Vec3f::zero() );
 			texCoords.push_back( Vec2f( u, v ) );

@@ -19,7 +19,7 @@ void main ( void )
 	//position			+= velocity;
 	//velocity			*= dampen;
 
-	vec3 pos			= vec3( uv.s, uv.t, texture2D( kinect, uv ).r );
+	vec3 pos			= vec3( uv.s, uv.t, texture2D( kinect, uv ).b );
 
 	gl_FragData[ 0 ]	= vec4( pos, 1.0 );//vec4( position, 1.0 );
 	gl_FragData[ 1 ]	= vec4( pos, 1.0 );//vec4( velocity, 1.0 );
