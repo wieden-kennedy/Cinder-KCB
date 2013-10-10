@@ -56,7 +56,6 @@ private:
 	void						onFrame( MsKinect::Frame frame );
 	
 	ci::CameraPersp				mCamera;
-	ci::gl::Fbo					mFboKinect;
 	ci::gl::Fbo					mFboGpGpu;
 	ci::gl::GlslProgRef			mShaderDraw;
 	ci::gl::GlslProgRef			mShaderGpGpu;
@@ -94,45 +93,44 @@ void ParticleApp::draw()
 		int32_t pong	= ( ping + 1 ) % 2;
 		ping			*= 2;
 		pong			*= 2;
-
+		gl::enable( GL_TEXTURE_2D );
 		{
-			gl::enableAlphaBlending();
-
 			mFboGpGpu.bindFramebuffer();
-			gl::setViewport( mFboGpGpu.getBounds() );
-			gl::setMatricesWindow( mFboGpGpu.getSize() );
 			const GLenum buffers[ 2 ] = {
 				GL_COLOR_ATTACHMENT0 + pong, 
 				GL_COLOR_ATTACHMENT1 + pong
 			};
 			glDrawBuffers( 2, buffers );
+			gl::setViewport( mFboGpGpu.getBounds() );
+			gl::setMatricesWindow( mFboGpGpu.getSize(), false );
 			for ( int32_t i = 0; i < 2; ++i ) {
 				mFboGpGpu.bindTexture( i, i + ping );
 			}
-
 			mTextureDepth->bind( 2 );
-
+			
 			mShaderGpGpu->bind();
-			mShaderGpGpu->uniform( "center",			mParticleCenter );
-			mShaderGpGpu->uniform( "dampen",			mParticleDampen );
-			mShaderGpGpu->uniform( "kinect",			2 );
-			mShaderGpGpu->uniform( "positions",			0 );
-			mShaderGpGpu->uniform( "speed",				mParticleSpeed );
-			mShaderGpGpu->uniform( "velocities",		1 );
+			mShaderGpGpu->uniform( "center",		mParticleCenter );
+			mShaderGpGpu->uniform( "dampen",		mParticleDampen );
+			mShaderGpGpu->uniform( "kinect",		2 );
+			mShaderGpGpu->uniform( "positions",		0 );
+			mShaderGpGpu->uniform( "speed",			mParticleSpeed );
+			mShaderGpGpu->uniform( "velocities",	1 );
 		
-			gl::drawSolidRect( mFboGpGpu.getBounds() );
-
+			gl::drawSolidRect( mFboGpGpu.getBounds(), true );
+			
 			mShaderGpGpu->unbind();
 			mTextureDepth->unbind();
 			mFboGpGpu.unbindTexture();
 			mFboGpGpu.unbindFramebuffer();
 		}
+		gl::disable( GL_TEXTURE_2D );
 
 		////////////////////////////////////////////////////////////////
 		// Draw particles
 
+		gl::setViewport( getWindowBounds() );
+		gl::clear();
 		{
-			gl::setViewport( getWindowBounds() );
 			gl::setMatrices( mCamera );
 
 			gl::enableAlphaBlending();
@@ -144,10 +142,10 @@ void ParticleApp::draw()
 			gl::enableDepthWrite();
 			gl::color( ColorAf::white() );
 
-			mFboGpGpu.bindTexture( 0, 0 + pong );
+			mFboGpGpu.bindTexture();
 
 			mShaderDraw->bind();
-			mShaderDraw->uniform( "positions",	0 );
+			mShaderDraw->uniform( "positions", 0 );
 
 			gl::draw( mMesh );
 
@@ -159,10 +157,9 @@ void ParticleApp::draw()
 		// Draw params, debug info
 
 		{
-			gl::setViewport( getWindowBounds() );
 			gl::setMatricesWindow( getWindowSize() );
-			gl::clear();
 			gl::disableAlphaBlending();
+			gl::enable( GL_TEXTURE_2D );
 			gl::color( ColorAf::white() );
 			
 			float x = (float)( getWindowWidth() - mTextureDepth->getWidth() / 4 );
@@ -181,6 +178,7 @@ void ParticleApp::draw()
 				gl::popMatrices();
 				y += (float)( mFboGpGpu.getTexture( i ).getHeight() / 4 );
 			}
+			gl::disable( GL_TEXTURE_2D );
 		}
 	}
 	
@@ -190,7 +188,7 @@ void ParticleApp::draw()
 void ParticleApp::onFrame( MsKinect::Frame frame )
 {
 	if ( frame.getDepthChannel() ) {
-		Channel32f depth = Channel32f( frame.getDepthChannel() );
+		Channel32f depth( frame.getDepthChannel() );
 		if ( mTextureDepth ) {
 			mTextureDepth->update( depth );
 		} else {
@@ -208,10 +206,9 @@ void ParticleApp::prepareSettings( Settings* settings )
 
 void ParticleApp::resize()
 {
-	gl::enable( GL_TEXTURE_2D );
-
 	mCamera = CameraPersp( getWindowWidth(), getWindowHeight(), 60.0f, 1.0f, 100.0f );
 	mCamera.lookAt( Vec3f( 0.0f, 0.0f, 5.0f ), Vec3f::zero() );
+	mCamera.setWorldUp( -Vec3f::yAxis() );
 }
 
 void ParticleApp::setup()
@@ -237,13 +234,14 @@ void ParticleApp::setup()
 
 	////////////////////////////////////////////////////////////////
 	// Define properties
-	mFrameRate					= 0.0f;
-	mFullScreen					= isFullScreen();
-	mFullScreenPrev				= mFullScreen;
-	mParticleDampen				= 1.0f;
-	mParticleCenter				= Vec3f::zero();
-	mParticleSpeed				= 0.021f;
-	mParticleTrails				= 0.0f;
+
+	mFrameRate			= 0.0f;
+	mFullScreen			= isFullScreen();
+	mFullScreenPrev		= mFullScreen;
+	mParticleDampen		= 1.0f;
+	mParticleCenter		= Vec3f::zero();
+	mParticleSpeed		= 0.021f;
+	mParticleTrails		= 0.0f;
 
 	////////////////////////////////////////////////////////////////
 	// Set up Kinect
@@ -308,14 +306,14 @@ void ParticleApp::setup()
 	// Set up parameters
 
 	mParams = params::InterfaceGl::create( "PARAMS", Vec2i( 200, 400 ) );
-	mParams->addParam( "Frame rate",			&mFrameRate,						"", true );
-	mParams->addParam( "Full screen",			&mFullScreen,						"key=f" );
-	mParams->addButton( "Quit",					bind( &ParticleApp::quit, this ),	"key=q" );
+	mParams->addParam( "Frame rate",		&mFrameRate,						"", true );
+	mParams->addParam( "Full screen",		&mFullScreen,						"key=f" );
+	mParams->addButton( "Quit",				bind( &ParticleApp::quit, this ),	"key=q" );
 	mParams->addSeparator( "" );
-	mParams->addParam( "Particle dampen",		&mParticleDampen,					"min=0.0 max=1.0 step=0.0001" );
-	mParams->addParam( "Particle origin",		&mParticleCenter );
-	mParams->addParam( "Particle speed",		&mParticleSpeed,					"min=-10.0 max=10.0 step=0.001" );
-	mParams->addParam( "Particle trails",		&mParticleTrails,					"min=0.0 max=1.0 step=0.000001" );
+	mParams->addParam( "Particle dampen",	&mParticleDampen,					"min=0.0 max=1.0 step=0.0001" );
+	mParams->addParam( "Particle origin",	&mParticleCenter );
+	mParams->addParam( "Particle speed",	&mParticleSpeed,					"min=-10.0 max=10.0 step=0.001" );
+	mParams->addParam( "Particle trails",	&mParticleTrails,					"min=0.0 max=1.0 step=0.000001" );
 
 	resize();
 }
