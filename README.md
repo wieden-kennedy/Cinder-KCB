@@ -1,4 +1,4 @@
-Cinder-KinectWrapperLib
+Cinder-KinectCommonBridge
 =======================
 
 1. Clone into Cinder's "blocks" directory.
