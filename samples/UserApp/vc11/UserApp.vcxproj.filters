@@ -47,7 +47,7 @@
     <ClInclude Include="..\..\..\src\FaceTracker.h">
       <Filter>blocks\Cinder-KinectWrapperLib</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\lib\KinectWrapperLib.h">
+    <ClInclude Include="..\..\..\lib\KinectCommonBridgeLib.h">
       <Filter>blocks\Cinder-KinectWrapperLib\lib</Filter>
     </ClInclude>
   </ItemGroup>

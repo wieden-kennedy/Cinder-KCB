@@ -51,7 +51,7 @@
 #include <list>
 #include <map>
 #include "ole2.h"
-#include "KinectWrapperLib.h"
+#include "KinectCommonBridgeLib.h"
 #include <vector>
 
 //! Kinect SDK wrapper for Cinder
@@ -348,7 +348,7 @@ protected:
 
 	DeviceOptions						mDeviceOptions;
 
-	void*								mKinect;
+	KCBHANDLE							mKinect;
 	INuiSensor*							mNuiSensor;
 
 	uint8_t*							mBufferColor;

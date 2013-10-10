@@ -71,8 +71,8 @@
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>cinder_d.lib;Kinect10.lib;KinectWrapper.lib;FaceTrackLib.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>..\..\..\..\..\lib;..\..\..\..\..\lib\msw;..\..\..\lib;$(KINECTSDK10_DIR)\lib\x86;$(FTSDK_DIR)Lib\x86;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>cinder_d.lib;Kinect10.lib;KinectCommonBridge.lib;FaceTrackLib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>..\..\..\..\..\lib;..\..\..\..\..\lib\msw;..\..\..\lib\x86;$(KINECTSDK10_DIR)\lib\x86;$(FTSDK_DIR)Lib\x86;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
       <RandomizedBaseAddress>false</RandomizedBaseAddress>
@@ -82,7 +82,7 @@
       <IgnoreSpecificDefaultLibraries>LIBCMT</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
-      <Command>xcopy "..\..\..\lib\*.dll" "$(ProjectDir)bin\" /Y /C
+      <Command>xcopy "..\..\..\lib\x86\*.dll" "$(ProjectDir)bin\" /Y /C
 xcopy "$(FTSDK_DIR)Redist\x86\*.dll" "$(ProjectDir)bin\" /Y /C</Command>
     </PreBuildEvent>
     <ResourceCompile>
@@ -103,8 +103,8 @@ xcopy "$(FTSDK_DIR)Redist\x86\*.dll" "$(ProjectDir)bin\" /Y /C</Command>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>
     </ProjectReference>
     <Link>
-      <AdditionalDependencies>cinder.lib;Kinect10.lib;KinectWrapper.lib;FaceTrackLib.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>..\..\..\..\..\lib;..\..\..\..\..\lib\msw;..\..\..\lib;$(KINECTSDK10_DIR)\lib\x86;$(FTSDK_DIR)Lib\x86;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>cinder.lib;Kinect10.lib;KinectCommonBridge.lib;FaceTrackLib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>..\..\..\..\..\lib;..\..\..\..\..\lib\msw;..\..\..\lib\x86;$(KINECTSDK10_DIR)\lib\x86;$(FTSDK_DIR)Lib\x86;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>false</GenerateDebugInformation>
       <GenerateMapFile>true</GenerateMapFile>
       <SubSystem>Windows</SubSystem>
@@ -117,7 +117,7 @@ xcopy "$(FTSDK_DIR)Redist\x86\*.dll" "$(ProjectDir)bin\" /Y /C</Command>
       <TargetMachine>MachineX86</TargetMachine>
     </Link>
     <PreBuildEvent>
-      <Command>xcopy "..\..\..\lib\*.dll" "$(ProjectDir)bin\" /Y /C
+      <Command>xcopy "..\..\..\lib\x86\*.dll" "$(ProjectDir)bin\" /Y /C
 xcopy "$(FTSDK_DIR)Redist\x86\*.dll" "$(ProjectDir)bin\" /Y /C</Command>
     </PreBuildEvent>
     <ResourceCompile>
@@ -136,7 +136,7 @@ xcopy "$(FTSDK_DIR)Redist\x86\*.dll" "$(ProjectDir)bin\" /Y /C</Command>
     <ResourceCompile Include="Resources.rc" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\lib\KinectWrapperLib.h" />
+    <ClInclude Include="..\..\..\lib\KinectCommonBridgeLib.h" />
     <ClInclude Include="..\..\..\src\FaceTracker.h" />
     <ClInclude Include="..\..\..\src\Kinect.h" />
   </ItemGroup>
