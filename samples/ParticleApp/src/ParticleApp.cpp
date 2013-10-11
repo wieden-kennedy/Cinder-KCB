@@ -54,19 +54,25 @@ public:
 private:
 	MsKinect::DeviceRef			mDevice;
 	void						onFrame( MsKinect::Frame frame );
-	
-	ci::CameraPersp				mCamera;
+
 	ci::gl::Fbo					mFbo[ 2 ];
 	ci::gl::GlslProgRef			mShaderDraw;
 	ci::gl::GlslProgRef			mShaderGpGpu;
 	ci::gl::VboMeshRef			mMesh;
 	ci::gl::TextureRef			mTextureDepth;
+	
+	ci::CameraPersp				mCamera;
+	ci::Vec3f					mEyePoint;
+	ci::Vec3f					mLookAt;
+	float						mPointCloudDepth;
 
 	float						mParticleDampen;
 	ci::Vec3f					mParticleCenter;
 	float						mParticleSpeed;
 	float						mParticleTrails;
 	
+	bool						mDrawParams;
+	bool						mDrawTextures;
 	float						mFrameRate;
 	bool						mFullScreen;
 	bool						mFullScreenPrev;
@@ -126,40 +132,37 @@ void ParticleApp::draw()
 		// Draw particles
 
 		gl::setViewport( getWindowBounds() );
-		gl::clear();
 		{
-			gl::setMatrices( mCamera );
-
+			gl::setMatricesWindow( getWindowSize() );
 			gl::enableAlphaBlending();
 			gl::disable( GL_TEXTURE_2D );
 			gl::color( ColorAf( Colorf::black(), 1.0f - mParticleTrails ) );
 			gl::drawSolidRect( getWindowBounds() );
-			gl::enable( GL_TEXTURE_2D );
-
+			gl::disableAlphaBlending();
+			
+			gl::setMatrices( mCamera );
 			gl::enableAdditiveBlending();
-			gl::enableDepthRead();
-			gl::enableDepthWrite();
+			gl::enable( GL_TEXTURE_2D );
 			gl::color( ColorAf::white() );
 
 			mFbo[ pong ].bindTexture();
 
 			mShaderDraw->bind();
-			mShaderDraw->uniform( "positions", 0 );
+			mShaderDraw->uniform( "depth",		mPointCloudDepth );
+			mShaderDraw->uniform( "positions",	0 );
+			mShaderDraw->uniform( "time",		(float)getElapsedSeconds() );
 
 			gl::draw( mMesh );
 
 			mShaderDraw->unbind();
 			mFbo[ pong ].unbindTexture();
-			
-			gl::disableDepthRead();
-			gl::disableDepthWrite();
 			gl::disableAlphaBlending();
 		}
 
 		////////////////////////////////////////////////////////////////
 		// Draw params, debug info
 
-		{
+		if ( mDrawTextures ) {
 			gl::setMatricesWindow( getWindowSize() );
 			gl::color( ColorAf::white() );
 			
@@ -183,7 +186,9 @@ void ParticleApp::draw()
 		}
 	}
 	
-	mParams->draw();
+	if ( mDrawParams ) {
+		mParams->draw();
+	}
 }
 
 void ParticleApp::onFrame( MsKinect::Frame frame )
@@ -203,11 +208,11 @@ void ParticleApp::prepareSettings( Settings* settings )
 
 void ParticleApp::resize()
 {
+	glPointSize( 0.25f );
 	gl::enable( GL_POINT_SMOOTH );
 	glHint( GL_POINT_SMOOTH_HINT, GL_NICEST );
 
-	mCamera = CameraPersp( getWindowWidth(), getWindowHeight(), 60.0f, 1.0f, 5000.0f );
-	mCamera.lookAt( Vec3f( 300.0f, 300.0f, 1200.0f ), Vec3f::zero() );
+	mCamera = CameraPersp( getWindowWidth(), getWindowHeight(), 60.0f, 1.0f, 50000.0f );
 	mCamera.setWorldUp( -Vec3f::yAxis() );
 }
 
@@ -235,12 +240,17 @@ void ParticleApp::setup()
 	////////////////////////////////////////////////////////////////
 	// Define properties
 
+	mDrawParams			= false;
+	mDrawTextures		= false;
+	mEyePoint			= Vec3f( 0.0f, 0.0f, 3000.0f );
 	mFrameRate			= 0.0f;
 	mFullScreen			= isFullScreen();
 	mFullScreenPrev		= mFullScreen;
-	mParticleDampen		= 0.97f;
-	mParticleSpeed		= 0.033f;
-	mParticleTrails		= 0.9f;
+	mLookAt				= Vec3f( 0.0f, -500.0f, 0.0f );
+	mParticleDampen		= 0.96f;
+	mParticleSpeed		= 0.05f;
+	mParticleTrails		= 0.92f;
+	mPointCloudDepth	= 3000.0f;
 
 	////////////////////////////////////////////////////////////////
 	// Set up Kinect
@@ -248,8 +258,6 @@ void ParticleApp::setup()
 	MsKinect::DeviceOptions deviceOptions;
 	deviceOptions.enableColor( false );
 	deviceOptions.enableNearMode();
-	deviceOptions.enableSeatedMode();
-	deviceOptions.enableUserTracking( false );
 	deviceOptions.setDepthResolution( MsKinect::ImageResolution::NUI_IMAGE_RESOLUTION_640x480 );
 	mDevice = MsKinect::Device::create();
 	mDevice->connectEventHandler( &ParticleApp::onFrame, this );
@@ -309,17 +317,25 @@ void ParticleApp::setup()
 	mParams->addParam( "Full screen",		&mFullScreen,						"key=f" );
 	mParams->addButton( "Quit",				bind( &ParticleApp::quit, this ),	"key=q" );
 	mParams->addSeparator( "" );
+	mParams->addParam( "Eye point",			&mEyePoint );
+	mParams->addParam( "Look at",			&mLookAt );
+	mParams->addParam( "Point cloud depth",	&mPointCloudDepth,					"min=-10000.0 max=10000.0 step=1.0" );
+	mParams->addSeparator( "" );
 	mParams->addParam( "Particle dampen",	&mParticleDampen,					"min=0.0 max=1.0 step=0.0001" );
 	mParams->addParam( "Particle origin",	&mParticleCenter );
 	mParams->addParam( "Particle speed",	&mParticleSpeed,					"min=-10.0 max=10.0 step=0.001" );
 	mParams->addParam( "Particle trails",	&mParticleTrails,					"min=0.0 max=1.0 step=0.000001" );
-
+	mParams->addSeparator( "" );
+	mParams->addParam( "Draw params",		&mDrawParams,						"key=p" );
+	mParams->addParam( "Draw textures",		&mDrawTextures,						"key=t" );
+	
 	resize();
 }
 
 void ParticleApp::update()
 {
 	mFrameRate = getAverageFps();
+	mCamera.lookAt( mEyePoint, mLookAt );
 
 	if ( mFullScreenPrev != mFullScreen ) {
 		setFullScreen( mFullScreen );
@@ -328,3 +344,4 @@ void ParticleApp::update()
 }
 
 CINDER_APP_BASIC( ParticleApp, RendererGl )
+ 

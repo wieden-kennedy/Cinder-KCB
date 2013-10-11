@@ -18,7 +18,9 @@ void main ( void )
 
 	velocity			+= normalize( destination - position ) * speed * depth;
 	
-	position			+= velocity;
+	if ( destination.z != position.z ) {
+		position			+= velocity;
+	}
 	position			= ( position - center ) * dampen * 0.5;
 	velocity			*= dampen;
 
