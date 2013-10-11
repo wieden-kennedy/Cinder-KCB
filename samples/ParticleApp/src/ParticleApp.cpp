@@ -85,13 +85,13 @@ using namespace std;
 void ParticleApp::draw()
 {
 	if ( mTextureDepth ) {
+		gl::enable( GL_TEXTURE_2D );
 		
 		////////////////////////////////////////////////////////////////
 		// GPGPU
 
-		int32_t ping	= getElapsedFrames() % 2;
-		int32_t pong	= ( ping + 1 ) % 2;
-		gl::enable( GL_TEXTURE_2D );
+		int32_t ping = getElapsedFrames() % 2;
+		int32_t pong = ( ping + 1 ) % 2;
 		{
 			mFbo[ pong ].bindFramebuffer();
 			const GLenum buffers[ 2 ] = {
@@ -121,7 +121,6 @@ void ParticleApp::draw()
 			mFbo[ ping ].unbindTexture();
 			mFbo[ pong ].unbindFramebuffer();
 		}
-		gl::disable( GL_TEXTURE_2D );
 
 		////////////////////////////////////////////////////////////////
 		// Draw particles
@@ -132,8 +131,10 @@ void ParticleApp::draw()
 			gl::setMatrices( mCamera );
 
 			gl::enableAlphaBlending();
+			gl::disable( GL_TEXTURE_2D );
 			gl::color( ColorAf( Colorf::black(), 1.0f - mParticleTrails ) );
 			gl::drawSolidRect( getWindowBounds() );
+			gl::enable( GL_TEXTURE_2D );
 
 			gl::enableAdditiveBlending();
 			gl::enableDepthRead();
@@ -160,29 +161,25 @@ void ParticleApp::draw()
 
 		{
 			gl::setMatricesWindow( getWindowSize() );
-			gl::enable( GL_TEXTURE_2D );
 			gl::color( ColorAf::white() );
 			
-			float x = (float)( getWindowWidth() - mTextureDepth->getWidth() / 4 );
+			float x = (float)( getWindowWidth() - mTextureDepth->getWidth() / 2 );
 			float y = 0.0f;
 
 			gl::pushMatrices();
 			gl::translate( x, y );
-			gl::draw( mTextureDepth, mTextureDepth->getBounds(), Rectf( mTextureDepth->getBounds() ) * 0.25f );
+			gl::draw( mTextureDepth, mTextureDepth->getBounds(), Rectf( mTextureDepth->getBounds() ) * 0.5f );
 			gl::popMatrices();
-			y += (float)( mTextureDepth->getHeight() / 4 );
+			y += (float)( mTextureDepth->getHeight() / 2 );
 
 			for ( int32_t i = 0; i < 2; ++i ) {
-				for ( int32_t j = 0; j < 2; ++j ) {
-					gl::pushMatrices();
-					gl::translate( x, y );
-					const gl::Texture& tex = mFbo[ i ].getTexture( j );
-					gl::draw( tex, tex.getBounds(), Rectf( tex.getBounds() ) * 0.25f );
-					gl::popMatrices();
-					y += (float)( tex.getHeight() / 4 );
-				}
+				gl::pushMatrices();
+				gl::translate( x, y );
+				const gl::Texture& tex = mFbo[ 0 ].getTexture( i );
+				gl::draw( tex, tex.getBounds(), Rectf( tex.getBounds() ) * 0.5f );
+				gl::popMatrices();
+				y += (float)( tex.getHeight() / 2 );
 			}
-			gl::disable( GL_TEXTURE_2D );
 		}
 	}
 	
@@ -192,9 +189,8 @@ void ParticleApp::draw()
 void ParticleApp::onFrame( MsKinect::Frame frame )
 {
 	if ( frame.getDepthChannel() ) {
-		//Surface16u depth	= MsKinect::depthChannelToSurface( frame.getDepthChannel(), MsKinect::DepthProcessOptions().enableRemoveBackground() );
-		//Surface16u depth	= MsKinect::depthChannelToSurface( frame.getDepthChannel() );
-		mTextureDepth		= gl::Texture::create( frame.getDepthChannel() );
+		Surface16u depth	= MsKinect::depthChannelToSurface( frame.getDepthChannel(), MsKinect::DepthProcessOptions().enableRemoveBackground() );
+		mTextureDepth		= gl::Texture::create( depth );
 	}
 }
 
@@ -207,8 +203,11 @@ void ParticleApp::prepareSettings( Settings* settings )
 
 void ParticleApp::resize()
 {
-	mCamera = CameraPersp( getWindowWidth(), getWindowHeight(), 60.0f, 1.0f, 100.0f );
-	mCamera.lookAt( Vec3f( 0.0f, 0.0f, 5.0f ), Vec3f::zero() );
+	gl::enable( GL_POINT_SMOOTH );
+	glHint( GL_POINT_SMOOTH_HINT, GL_NICEST );
+
+	mCamera = CameraPersp( getWindowWidth(), getWindowHeight(), 60.0f, 1.0f, 5000.0f );
+	mCamera.lookAt( Vec3f( 300.0f, 300.0f, 1200.0f ), Vec3f::zero() );
 	mCamera.setWorldUp( -Vec3f::yAxis() );
 }
 
@@ -239,16 +238,17 @@ void ParticleApp::setup()
 	mFrameRate			= 0.0f;
 	mFullScreen			= isFullScreen();
 	mFullScreenPrev		= mFullScreen;
-	mParticleDampen		= 1.0f;
-	mParticleCenter		= Vec3f::zero();
-	mParticleSpeed		= 0.021f;
-	mParticleTrails		= 0.0f;
+	mParticleDampen		= 0.97f;
+	mParticleSpeed		= 0.033f;
+	mParticleTrails		= 0.9f;
 
 	////////////////////////////////////////////////////////////////
 	// Set up Kinect
 
 	MsKinect::DeviceOptions deviceOptions;
 	deviceOptions.enableColor( false );
+	deviceOptions.enableNearMode();
+	deviceOptions.enableSeatedMode();
 	deviceOptions.enableUserTracking( false );
 	deviceOptions.setDepthResolution( MsKinect::ImageResolution::NUI_IMAGE_RESOLUTION_640x480 );
 	mDevice = MsKinect::Device::create();
@@ -267,11 +267,10 @@ void ParticleApp::setup()
 	for ( size_t i = 0; i < 2; ++i ) {
 		mFbo[ i ] = gl::Fbo( deviceOptions.getDepthSize().x, deviceOptions.getDepthSize().y, format );
 		mFbo[ i ].bindFramebuffer();
+		const GLenum buffers[ 2 ] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+		glDrawBuffers( 2, buffers );
 		gl::setViewport( mFbo[ i ].getBounds() );
 		gl::setMatricesWindow( mFbo[ i ].getSize() );
-		glDrawBuffer( GL_COLOR_ATTACHMENT0 );
-		gl::clear( Colorf( ColorModel::CM_RGB, mParticleCenter ) );
-		glDrawBuffer( GL_COLOR_ATTACHMENT1 );
 		gl::clear();
 		mFbo[ i ].unbindFramebuffer();
 	}
@@ -279,14 +278,16 @@ void ParticleApp::setup()
 	vector<uint32_t> indices;
 	vector<Vec3f> positions;
 	vector<Vec2f> texCoords;
-	uint32_t i = 0;
-	for ( int32_t x = 0; x < mFbo[ 0 ].getWidth(); ++x ) {
-		for ( int32_t y = 0; y < mFbo[ 0 ].getHeight(); ++y, ++i ) {
-			float u = (float)x / (float)mFbo[ 0 ].getWidth();
-			float v = (float)y / (float)mFbo[ 0 ].getHeight();
-			indices.push_back( i );
-			positions.push_back( Vec3f::zero() );
-			texCoords.push_back( Vec2f( u, v ) );
+	int32_t h	= mFbo[ 0 ].getHeight();
+	int32_t w	= mFbo[ 0 ].getWidth();
+	for ( int32_t x = 0; x < w; ++x ) {
+		for ( int32_t y = 0; y < h; ++y ) {
+			indices.push_back( (uint32_t)( x * h + y ) );
+			texCoords.push_back( Vec2f( (float)x / (float)( w - 1 ), (float)y / (float)( h - 1 ) ) );
+			positions.push_back( Vec3f(
+				( texCoords.rbegin()->x * 2.0f - 1.0f ) * (float)h, 
+				( texCoords.rbegin()->y * 2.0f - 1.0f ) * (float)w, 
+				0.0f ) );
 		}
 	}
 	gl::VboMesh::Layout layout;

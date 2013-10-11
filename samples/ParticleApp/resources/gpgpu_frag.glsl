@@ -10,18 +10,19 @@ varying vec2		uv;
 
 void main ( void )
 {
-	//vec3 position		= texture2D( positions,		uv ).rgb;
-	//vec3 velocity		= texture2D( velocities,	uv ).rgb;
+	vec3 position		= texture2D( positions,		uv ).rgb;
+	vec3 velocity		= texture2D( velocities,	uv ).rgb;
+
+	vec3 destination	= vec3( uv.s, uv.t, 1.0 - texture2D( kinect, uv ).b );
+	float depth			= destination.z;
+
+	velocity			+= normalize( destination - position ) * speed * depth;
 	
-	//velocity			+= normalize( destination - position ) * speed;
-	//velocity			+= normalize( center - position ) * speed * 0.5;
+	position			+= velocity;
+	position			= ( position - center ) * dampen * 0.5;
+	velocity			*= dampen;
 
-	//position			+= velocity;
-	//velocity			*= dampen;
-
-	vec3 pos			= vec3( uv.s, uv.t, texture2D( kinect, uv ).b );
-
-	gl_FragData[ 0 ]	= vec4( pos, 1.0 );//vec4( position, 1.0 );
-	gl_FragData[ 1 ]	= vec4( pos, 1.0 );//vec4( velocity, 1.0 );
+	gl_FragData[ 0 ]	= vec4( position, 1.0 );
+	gl_FragData[ 1 ]	= vec4( velocity, 1.0 );
 }
  
