@@ -60,7 +60,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\..\..\..\..\include;..\..\..\..\..\boost;..\..\..\lib;..\..\..\src;$(KINECTSDK10_DIR)\inc;$(FTSDK_DIR)inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\..\..\include;..\..\..\..\..\boost;..\..\..\lib;..\..\..\src;$(KINECTSDK10_DIR)\inc;$(KINECT_TOOLKIT_DIR)inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -72,7 +72,7 @@
     </ClCompile>
     <Link>
       <AdditionalDependencies>cinder_d.lib;Kinect10.lib;KinectCommonBridge.lib;FaceTrackLib.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>..\..\..\..\..\lib;..\..\..\..\..\lib\msw;..\..\..\lib\x86;$(KINECTSDK10_DIR)\lib\x86;$(FTSDK_DIR)Lib\x86;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>..\..\..\..\..\lib;..\..\..\..\..\lib\msw;..\..\..\lib\x86;$(KINECTSDK10_DIR)\lib\x86;$(KINECT_TOOLKIT_DIR)Lib\x86;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
       <RandomizedBaseAddress>false</RandomizedBaseAddress>
@@ -83,7 +83,7 @@
     </Link>
     <PreBuildEvent>
       <Command>xcopy "..\..\..\lib\x86\*.dll" "$(ProjectDir)bin\" /Y /C
-xcopy "$(FTSDK_DIR)Redist\x86\*.dll" "$(ProjectDir)bin\" /Y /C</Command>
+xcopy "$(KINECT_TOOLKIT_DIR)Redist\x86\*.dll" "$(ProjectDir)bin\" /Y /C</Command>
     </PreBuildEvent>
     <ResourceCompile>
       <AdditionalIncludeDirectories>..\..\..\..\..\include</AdditionalIncludeDirectories>
@@ -91,7 +91,7 @@ xcopy "$(FTSDK_DIR)Redist\x86\*.dll" "$(ProjectDir)bin\" /Y /C</Command>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
-      <AdditionalIncludeDirectories>..\..\..\..\..\include;..\..\..\..\..\boost;..\..\..\lib;..\..\..\src;$(KINECTSDK10_DIR)\inc;$(FTSDK_DIR)inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\..\..\include;..\..\..\..\..\boost;..\..\..\lib;..\..\..\src;$(KINECTSDK10_DIR)\inc;$(KINECT_TOOLKIT_DIR)inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <PrecompiledHeader>
@@ -104,7 +104,7 @@ xcopy "$(FTSDK_DIR)Redist\x86\*.dll" "$(ProjectDir)bin\" /Y /C</Command>
     </ProjectReference>
     <Link>
       <AdditionalDependencies>cinder.lib;Kinect10.lib;KinectCommonBridge.lib;FaceTrackLib.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>..\..\..\..\..\lib;..\..\..\..\..\lib\msw;..\..\..\lib\x86;$(KINECTSDK10_DIR)\lib\x86;$(FTSDK_DIR)Lib\x86;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>..\..\..\..\..\lib;..\..\..\..\..\lib\msw;..\..\..\lib\x86;$(KINECTSDK10_DIR)\lib\x86;$(KINECT_TOOLKIT_DIR)Lib\x86;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>false</GenerateDebugInformation>
       <GenerateMapFile>true</GenerateMapFile>
       <SubSystem>Windows</SubSystem>
@@ -118,7 +118,7 @@ xcopy "$(FTSDK_DIR)Redist\x86\*.dll" "$(ProjectDir)bin\" /Y /C</Command>
     </Link>
     <PreBuildEvent>
       <Command>xcopy "..\..\..\lib\x86\*.dll" "$(ProjectDir)bin\" /Y /C
-xcopy "$(FTSDK_DIR)Redist\x86\*.dll" "$(ProjectDir)bin\" /Y /C</Command>
+xcopy "$(KINECT_TOOLKIT_DIR)Redist\x86\*.dll" "$(ProjectDir)bin\" /Y /C</Command>
     </PreBuildEvent>
     <ResourceCompile>
       <AdditionalIncludeDirectories>..\..\..\..\..\include</AdditionalIncludeDirectories>
