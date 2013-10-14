@@ -1,4 +1,5 @@
-Cinder-KinectCommonBridge
+Cinder-KCB
+Kinect Common Bridge implementation for Cinder.
 =========================
 
 Clone into Cinder's "blocks" directory.
