@@ -103,6 +103,8 @@ size_t									calcNumUsersFromDepth( const ci::Channel16u& depth );
 //! Creates a surface with colorized users from \a depth.
 ci::Surface16u							depthChannelToSurface( const ci::Channel16u& depth, 
 															  const DepthProcessOptions& depthProcessOptions = DepthProcessOptions() );
+//! Returns depth value as 0.0 - 1.0 float for pixel at \a pos.
+float									getDepthAtCoord( const ci::Channel16u& depth, const ci::Vec2i& v );
 //! Returns number of Kinect devices.
 size_t									getDeviceCount();
 //! Returns use color for user ID \a id.
@@ -311,8 +313,6 @@ public:
 	//! Enables verbose error reporting in debug console. Default is true.
 	void								enableVerbose( bool enable = true );
 
-	//! Returns depth value as 0.0 - 1.0 float for pixel at \a pos.
-	float								getDepthAt( const ci::Vec2i& v ) const;
 	//! Returns options object for this device.
 	const DeviceOptions&				getDeviceOptions() const;
 	//! Returns accelerometer reading.
@@ -336,6 +336,8 @@ public:
 	}
 	//! Sets frame event handler. Signature is void( Frame ).
 	void								connectEventHandler( const std::function<void ( Frame )>& eventHandler );
+
+	ci::Vec2f							test( const std::function<void ()>& eventHandler );
 protected:
 	static const int32_t				WAIT_TIME = 100;
 
@@ -345,7 +347,7 @@ protected:
 	virtual void						update();
 
 	std::function<void ( Frame frame )>	mEventHandler;
-
+	
 	DeviceOptions						mDeviceOptions;
 
 	KCBHANDLE							mKinect;

@@ -43,7 +43,6 @@
 
 namespace MsKinect
 {
-
 using namespace ci;
 using namespace ci::app;
 using namespace std;
@@ -155,6 +154,17 @@ Surface16u depthChannelToSurface( const Channel16u& depth, const DepthProcessOpt
 		}
 	}
 	return surface;
+}
+
+float getDepthAtCoord( const ci::Channel16u& depth, const ci::Vec2i& v ) 
+{
+	float depthNorm		= 0.0f;
+	if ( depth ) {
+		uint16_t d	= 0x10000 - depth.getValue( v );
+		d			= d << 2;
+		depthNorm	= 1.0f - (float)d / 65535.0f;
+	}
+	return depthNorm;
 }
 
 size_t getDeviceCount()
@@ -651,17 +661,6 @@ void Device::errorNui( long hr ) {
 		console() << "Unknown error (Code " + toString( hr ) + ")";
 	}
 	console() << endl;
-}
-
-float Device::getDepthAt( const Vec2i& pos ) const
-{
-	float depthNorm		= 0.0f;
-	if ( mChannelDepth ) {
-		uint16_t depth	= 0x10000 - mChannelDepth.getValue( pos );
-		depth			= depth << 2;
-		depthNorm		= 1.0f - (float)depth / 65535.0f;
-	}
-	return depthNorm;
 }
 
 const DeviceOptions& Device::getDeviceOptions() const
