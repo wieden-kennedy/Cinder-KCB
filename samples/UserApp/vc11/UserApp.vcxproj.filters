@@ -12,10 +12,10 @@
     <Filter Include="blocks">
       <UniqueIdentifier>{91831fb1-aa3f-4402-a6d9-0f176988c673}</UniqueIdentifier>
     </Filter>
-    <Filter Include="blocks\Cinder-KinectCommonBridge">
+    <Filter Include="blocks\Cinder-KCB">
       <UniqueIdentifier>{283212cd-4dad-4d11-aea7-e74e45dbf2df}</UniqueIdentifier>
     </Filter>
-    <Filter Include="blocks\Cinder-KinectCommonBridge\lib">
+    <Filter Include="blocks\Cinder-KCB\lib">
       <UniqueIdentifier>{131e7562-3efa-4e2f-b7fa-0dd2abb89c17}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
@@ -24,10 +24,10 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\Kinect.cpp">
-      <Filter>blocks\Cinder-KinectCommonBridge</Filter>
+      <Filter>blocks\Cinder-KCB</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\FaceTracker.cpp">
-      <Filter>blocks\Cinder-KinectCommonBridge</Filter>
+      <Filter>blocks\Cinder-KCB</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -42,13 +42,13 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\Kinect.h">
-      <Filter>blocks\Cinder-KinectCommonBridge</Filter>
+      <Filter>blocks\Cinder-KCB</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\FaceTracker.h">
-      <Filter>blocks\Cinder-KinectCommonBridge</Filter>
+      <Filter>blocks\Cinder-KCB</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\lib\KinectCommonBridgeLib.h">
-      <Filter>blocks\Cinder-KinectCommonBridge\lib</Filter>
+      <Filter>blocks\Cinder-KCB\lib</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
