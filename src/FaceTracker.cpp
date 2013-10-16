@@ -87,17 +87,9 @@ FaceTrackerRef FaceTracker::create()
 }
 
 FaceTracker::FaceTracker()
+	: mCalcMesh( true ), mCalcMesh2d( true ), mEventHandler( nullptr ), mFaceTracker( 0 ), 
+	mModel( 0 ), mNewFace( false ), mResult( 0 ), mRunning( false ), mUserId( 0 )
 {
-	mCalcMesh		= true;
-	mCalcMesh2d		= true;
-	mEventHandler	= nullptr;
-	mFaceTracker	= 0;
-	mModel			= 0;
-	mNewFace		= false;
-	mResult			= 0;
-	mRunning		= false;
-	mSuccess		= false;
-	mUserId			= 0;
 }
 
 FaceTracker::~FaceTracker()

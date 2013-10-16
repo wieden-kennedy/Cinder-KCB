@@ -29,8 +29,8 @@
     <ClCompile Include="..\..\..\src\FaceTracker.cpp">
       <Filter>blocks\Cinder-KCB</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\HandFinder.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="..\..\..\src\HandTracker.cpp">
+      <Filter>blocks\Cinder-KCB</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -53,8 +53,8 @@
     <ClInclude Include="..\..\..\lib\KinectCommonBridgeLib.h">
       <Filter>blocks\Cinder-KCB\lib</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\HandFinder.h">
-      <Filter>Source Files</Filter>
+    <ClInclude Include="..\..\..\src\HandTracker.h">
+      <Filter>blocks\Cinder-KCB</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

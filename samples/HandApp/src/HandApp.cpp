@@ -37,20 +37,20 @@
 #include "cinder/app/AppBasic.h"
 #include "cinder/gl/Texture.h"
 #include "cinder/params/Params.h"
-#include "HandFinder.h"
+#include "HandTracker.h"
 #include "Kinect.h"
 
 class HandApp : public ci::app::AppBasic 
 {
 public:
-	void 						draw();	
-	void						keyDown( ci::app::KeyEvent event );
-	void 						setup();
+	void 										draw();	
+	void										keyDown( ci::app::KeyEvent event );
+	void 										setup();
 private:
-	MsKinect::DeviceRef			mDevice;
-	ci::Channel16u				mDepthChannel;
-	ci::gl::TextureRef			mDepthTexture;
-	std::vector<MsKinect::Hand>	mHands;
+	MsKinect::DeviceRef							mDevice;
+	MsKinect::Frame								mFrame;
+	MsKinect::HandTrackerRef					mHandTracker;
+	std::vector<MsKinect::HandTracker::Hand>	mHands;
 };
 
 using namespace ci;
@@ -63,19 +63,41 @@ void HandApp::draw()
 	gl::clear();
 	gl::setMatricesWindow( getWindowSize() );
 	
-	if ( mDepthChannel ) {
+	if ( mFrame.getDepthChannel() ) {
+
+		gl::TextureRef tex = gl::Texture::create( mFrame.getDepthChannel() );
+
 		gl::color( ColorAf::white() );
 		gl::enable( GL_TEXTURE_2D );
-		gl::draw( mDepthTexture, mDepthTexture->getBounds(), getWindowBounds() );
+		gl::draw( tex, tex->getBounds(), getWindowBounds() );
 		gl::disable( GL_TEXTURE_2D );
 
 		gl::pushMatrices();
-		gl::scale( Vec2f( getWindowSize() ) / Vec2f( mDepthTexture->getSize() ) );
-		for ( auto hand : mHands ) {
-			for ( auto finger : hand.getFingerTipPositions() ) {
+		gl::scale( Vec2f( getWindowSize() ) / Vec2f( tex->getSize() ) );
+
+		for ( const auto& skeleton : mFrame.getSkeletons() ) {
+			for ( const auto& joint : skeleton ) {
+				const MsKinect::Bone& bone = joint.second;
+
+				Vec2i v0 = MsKinect::mapSkeletonCoordToDepth( 
+					bone.getPosition(), 
+					mDevice->getDeviceOptions().getDepthResolution() 
+					);
+				Vec2i v1 = MsKinect::mapSkeletonCoordToDepth( 
+					skeleton.at( bone.getStartJoint() ).getPosition(), 
+					mDevice->getDeviceOptions().getDepthResolution() 
+					);
+				gl::drawLine( v0, v1 );
+				gl::drawSolidCircle( v0, 5.0f, 16 );
+			}
+		}
+
+		for ( const auto& hand : mHands ) {
+			for ( const auto& finger : hand.getFingerTipPositions() ) {
 				gl::drawStrokedCircle( finger, 5.0f, 24 );
 			}
 		}
+
 		gl::popMatrices();
 	}
 }
@@ -100,16 +122,19 @@ void HandApp::setup()
 	mDevice = MsKinect::Device::create();
 	mDevice->connectEventHandler( [ & ]( MsKinect::Frame frame )
 	{
-		if ( frame.getDepthChannel() ) {
-			mDepthChannel	= frame.getDepthChannel();
-			mDepthTexture	= gl::Texture::create( mDepthChannel );
-			mHands			= MsKinect::findHands( mDepthChannel, frame.getSkeletons(), mDevice->getDeviceOptions() );
-			for ( auto hand : mHands ) {
-				console() << hand.getFingerTipPositions().size() << endl;
-			}
+		mFrame = frame;
+		if ( mHandTracker ) {
+			mHandTracker->update( mFrame.getDepthChannel(), mFrame.getSkeletons() );
 		}
 	} );
 	mDevice->start();
+
+	mHandTracker = MsKinect::HandTracker::create();
+	mHandTracker->connectEventHander( [ & ]( vector<MsKinect::HandTracker::Hand> hands )
+	{
+		mHands = hands;
+	} );
+	mHandTracker->start( mDevice->getDeviceOptions() );
 }
 
 CINDER_APP_BASIC( HandApp, RendererGl )

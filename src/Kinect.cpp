@@ -156,11 +156,24 @@ Surface16u depthChannelToSurface( const Channel16u& depth, const DepthProcessOpt
 	return surface;
 }
 
-float getDepthAtCoord( const ci::Channel16u& depth, const ci::Vec2i& v ) 
+void CALLBACK deviceStatus( long hr, const wchar_t *instanceName, const wchar_t *deviceId, void *data )
 {
-	float depthNorm		= 0.0f;
+	Device* device = reinterpret_cast<Device*>( data );
+	if ( SUCCEEDED( hr ) ) {
+		device->start( device->getDeviceOptions() );
+	} else {
+		device->errorNui( hr );
+		device->stop();
+	}
+}
+
+float getDepthAtCoord( const Channel16u& depth, const Vec2i& v ) 
+{
+	float depthNorm	= 0.0f;
 	if ( depth ) {
-		uint16_t d	= 0x10000 - depth.getValue( v );
+		uint16_t d	= depth.getValue( v );
+		d			= 0x10000 * ( ( d & 0xFFF8 ) >> 3 ) / 0x0FFF;
+		d			= 0x10000 - d;
 		d			= d << 2;
 		depthNorm	= 1.0f - (float)d / 65535.0f;
 	}
@@ -228,11 +241,6 @@ Vec2i mapSkeletonCoordToDepth( const Vec3f& v, ImageResolution depthResolution )
 	return Vec2i( (int32_t)x, (int32_t)y );
 }
 
-uint16_t userIdFromDepthCoord( const Channel16u& depth, const Vec2i& v )
-{
-	return NuiDepthPixelToPlayerIndex( depth.getValue( v ) );
-}
-
 Matrix44f toMatrix44f( const Matrix4& m ) 
 {
 	return Matrix44f( Vec4f( m.M11, m.M12, m.M13, m.M14 ), 
@@ -249,15 +257,9 @@ Vec3f toVec3f( const Vector4& v )
 	return Vec3f( v.x, v.y, v.z );
 }
 
-void CALLBACK deviceStatus( long hr, const WCHAR *instanceName, const WCHAR *deviceId, void *data )
+uint16_t userIdFromDepthCoord( const Channel16u& depth, const Vec2i& v )
 {
-	Device* device = reinterpret_cast<Device*>( data );
-	if ( SUCCEEDED( hr ) ) {
-		device->start( device->getDeviceOptions() );
-	} else {
-		device->errorNui( hr );
-		reinterpret_cast<Device*>( data )->stop();
-	}
+	return NuiDepthPixelToPlayerIndex( depth.getValue( v ) );
 }
 
 const NUI_TRANSFORM_SMOOTH_PARAMETERS	kTransformNone			= { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
@@ -540,9 +542,9 @@ Frame::Frame()
 }
 
 Frame::Frame( long long frameId, const std::string& deviceId, const Surface8u& color, 
-			 const Channel16u& depth, const Channel16u& infrared, const std::vector<Skeleton>& skeletons )
-	: mColorSurface( color ), mDepthChannel( depth ), mDeviceId( deviceId ), mFrameId( frameId ), 
-	mInfraredChannel( infrared ), mSkeletons( skeletons )
+			 const Channel16u& depth, const Channel16u& infrared, const std::vector<Skeleton>& skeletons ) 
+	: mColorSurface( color ), mDepthChannel( depth ), mDeviceId( deviceId ), 
+	mFrameId( frameId ), mInfraredChannel( infrared ), mSkeletons( skeletons )
 {
 }
 

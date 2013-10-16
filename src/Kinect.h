@@ -375,7 +375,7 @@ protected:
 	void								statusKinect( KINECT_SENSOR_STATUS status );
 	std::string							wcharToString( wchar_t* v );
 	
-	friend void __stdcall				deviceStatus( long hr, const WCHAR* instanceName, const WCHAR* deviceId, void* data );
+	friend void __stdcall				deviceStatus( long hr, const wchar_t* instanceName, const wchar_t* deviceId, void* data );
 
 	//////////////////////////////////////////////////////////////////////////////////////////////
 

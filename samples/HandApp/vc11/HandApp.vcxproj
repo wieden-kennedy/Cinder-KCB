@@ -126,9 +126,9 @@ xcopy "$(KINECT_TOOLKIT_DIR)Redist\x86\*.dll" "$(ProjectDir)bin\" /Y /C</Command
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\FaceTracker.cpp" />
+    <ClCompile Include="..\..\..\src\HandTracker.cpp" />
     <ClCompile Include="..\..\..\src\Kinect.cpp" />
     <ClCompile Include="..\src\HandApp.cpp" />
-    <ClCompile Include="..\src\HandFinder.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="cinder_app_icon.ico" />
@@ -139,8 +139,8 @@ xcopy "$(KINECT_TOOLKIT_DIR)Redist\x86\*.dll" "$(ProjectDir)bin\" /Y /C</Command
   <ItemGroup>
     <ClInclude Include="..\..\..\lib\KinectCommonBridgeLib.h" />
     <ClInclude Include="..\..\..\src\FaceTracker.h" />
+    <ClInclude Include="..\..\..\src\HandTracker.h" />
     <ClInclude Include="..\..\..\src\Kinect.h" />
-    <ClInclude Include="..\src\HandFinder.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
