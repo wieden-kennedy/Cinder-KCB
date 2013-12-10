@@ -117,7 +117,6 @@ void HandApp::keyDown( KeyEvent event )
 void HandApp::setup()
 {
 	setFrameRate( 60.0f );
-	//setFullScreen( true );
 
 	mDevice = MsKinect::Device::create();
 	mDevice->connectEventHandler( [ & ]( MsKinect::Frame frame )
@@ -127,7 +126,25 @@ void HandApp::setup()
 			mHandTracker->update( mFrame.getDepthChannel(), mFrame.getSkeletons() );
 		}
 	} );
-	mDevice->start();
+	try {
+		mDevice->start();
+	} catch ( MsKinect::Device::ExcDeviceCreate ex ) {
+		console() << ex.what() << endl;
+	} catch ( MsKinect::Device::ExcDeviceInit ex ) {
+		console() << ex.what() << endl;
+	} catch ( MsKinect::Device::ExcDeviceInvalid ex ) {
+		console() << ex.what() << endl;
+	} catch ( MsKinect::Device::ExcGetCoordinateMapper ex ) {
+		console() << ex.what() << endl;
+	} catch ( MsKinect::Device::ExcOpenStreamColor ex ) {
+		console() << ex.what() << endl;
+	} catch ( MsKinect::Device::ExcOpenStreamDepth ex ) {
+		console() << ex.what() << endl;
+	} catch ( MsKinect::Device::ExcStreamStart ex ) {
+		console() << ex.what() << endl;
+	} catch ( MsKinect::Device::ExcUserTrackingEnable ex ) {
+		console() << ex.what() << endl;
+	}
 
 	mHandTracker = MsKinect::HandTracker::create();
 	mHandTracker->connectEventHander( [ & ]( vector<MsKinect::HandTracker::Hand> hands )

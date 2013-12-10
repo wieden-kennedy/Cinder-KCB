@@ -111,12 +111,14 @@ size_t									getDeviceCount();
 ci::Colorf								getUserColor( uint32_t id );
 //! Returns pixel location of color position in depth image.
 ci::Vec2i								mapColorCoordToDepth( const ci::Vec2i& v, const ci::Channel16u& depth, 
-															 ImageResolution colorResolution, ImageResolution depthResolution );
-//! Returns pixel location of skeleton position in color image. Requires depth resolution.s
-ci::Vec2i								mapSkeletonCoordToColor( const ci::Vec3f& v, const ci::Channel16u& depth, 
-																ImageResolution colorResolution, ImageResolution depthResolution );
+															  const DeviceRef& device );
+//! Returns pixel location of color position in depth image.
+ci::Vec2i								mapDepthCoordToColor( const ci::Vec2i& v, const ci::Channel16u& depth, 
+															  const DeviceRef& device );
+//! Returns pixel location of skeleton position in color image. Requires depth resolution.
+ci::Vec2i								mapSkeletonCoordToColor( const ci::Vec3f& v, const DeviceRef& device );
 //! Returns pixel location of skeleton position in depth image.
-ci::Vec2i								mapSkeletonCoordToDepth( const ci::Vec3f& v, ImageResolution depthResolution );
+ci::Vec2i								mapSkeletonCoordToDepth( const ci::Vec3f& v, const DeviceRef& device );
 //! Returns user ID for pixel at \a coord in \a depth. 0 is no user.
 uint16_t								userIdFromDepthCoord( const ci::Channel16u& depth, const ci::Vec2i& v );
 
@@ -252,6 +254,7 @@ protected:
 	std::string							mDeviceId;
 	int32_t								mDeviceIndex;
 };
+
 //////////////////////////////////////////////////////////////////////////////////////////////
 
 /*! Class representing Kinect frame data. A frame only contains data 
@@ -313,6 +316,8 @@ public:
 	//! Enables verbose error reporting in debug console. Default is true.
 	void								enableVerbose( bool enable = true );
 
+	//! Returns coordinate mapper for this device.
+	INuiCoordinateMapper*				getCoordinateMapper() const;
 	//! Returns options object for this device.
 	const DeviceOptions&				getDeviceOptions() const;
 	//! Returns accelerometer reading.
@@ -349,7 +354,8 @@ protected:
 	std::function<void ( Frame frame )>	mEventHandler;
 	
 	DeviceOptions						mDeviceOptions;
-
+	
+	INuiCoordinateMapper*				mCoordinateMapper;
 	KCBHANDLE							mKinect;
 	INuiSensor*							mNuiSensor;
 
@@ -376,6 +382,10 @@ protected:
 	std::string							wcharToString( wchar_t* v );
 	
 	friend void __stdcall				deviceStatus( long hr, const wchar_t* instanceName, const wchar_t* deviceId, void* data );
+	friend ci::Vec2i					mapDepthCoordToColor( const ci::Vec2i& v, const ci::Channel16u& depth, 
+															  const DeviceRef& device );
+	friend ci::Vec2i					mapSkeletonCoordToColor( const ci::Vec3f& v, const DeviceRef& device );
+	friend ci::Vec2i					mapSkeletonCoordToDepth( const ci::Vec3f& v, const DeviceRef& device );
 
 	//////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -410,25 +420,46 @@ public:
 		ExcDeviceInvalid( long hr, const std::string& id ) throw();
 	};
 
+	//! Exception representing attempt to get coordinate mapper.
+	class ExcGetCoordinateMapper : public Exception 
+	{
+	public:
+		ExcGetCoordinateMapper( long hr, const std::string& id ) throw();
+	};
+
 	//! Exception representing failure to open color stream.
 	class ExcOpenStreamColor : public Exception
 	{
 	public:
-		ExcOpenStreamColor( long hr ) throw();
+		ExcOpenStreamColor( long hr, const std::string& id ) throw();
 	};
 
 	//! Exception representing failure to open depth stream.
 	class ExcOpenStreamDepth : public Exception
 	{
 	public:
-		ExcOpenStreamDepth( long hr ) throw();
+		ExcOpenStreamDepth( long hr, const std::string& id ) throw();
 	};
 
-	//! Exception representing failure to enable skeleton tracking.
-	class ExcSkeletonTrackingEnable : public Exception
+	//! Exception representing failure to open infrared stream.
+	class ExcOpenStreamInfrared : public Exception
 	{
 	public:
-		ExcSkeletonTrackingEnable( long hr ) throw();
+		ExcOpenStreamInfrared( long hr, const std::string& id ) throw();
+	};
+
+	//! Exception representing failure to start open streams.
+	class ExcStreamStart : public Exception
+	{
+	public:
+		ExcStreamStart( long hr, const std::string& id ) throw();
+	};
+
+	//! Exception representing failure to enable user tracking.
+	class ExcUserTrackingEnable : public Exception
+	{
+	public:
+		ExcUserTrackingEnable( long hr, const std::string& id ) throw();
 	};
 };
 }

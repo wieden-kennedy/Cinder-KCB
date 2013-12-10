@@ -207,38 +207,77 @@ Colorf getUserColor( uint32_t id )
 	}
 }
 
-Vec2i mapColorCoordToDepth( const Vec2i& v, const Channel16u& depth, 
-						   ImageResolution colorResolution, ImageResolution depthResolution )
+Vec2i mapColorCoordToDepth( const Vec2i& v, const Channel16u& depth, const DeviceRef& device )
 {
 	long x;
 	long y;
-	NuiImageGetColorPixelCoordinatesFromDepthPixelAtResolution( 
-		colorResolution, 
-		depthResolution, 
-		0, v.x, v.y, 
-		depth.getValue( v ), &x, &y ); 
+	if ( depth && device ) {
+		NuiImageGetColorPixelCoordinatesFromDepthPixelAtResolution( 
+			device->getDeviceOptions().getColorResolution(), 
+			device->getDeviceOptions().getDepthResolution(), 
+			0, v.x, v.y, 
+			depth.getValue( v ), &x, &y );
+	}
 	return Vec2i( (int32_t)x, (int32_t)y );
 }
 
-Vec2i mapSkeletonCoordToColor( const Vec3f& v, const Channel16u& depth, 
-							  ImageResolution colorResolution, ImageResolution depthResolution )
+Vec2i mapDepthCoordToColor( const Vec2i& v, const Channel16u& depth, const DeviceRef& device )
 {
-	Vec2i v2	= mapSkeletonCoordToDepth( v, depthResolution );
-	v2			= mapColorCoordToDepth( v2, depth, colorResolution, depthResolution );
-	return v2;
+	NUI_COLOR_IMAGE_POINT mapped;
+	if ( depth && device && device->getCoordinateMapper() ) {
+		NUI_DEPTH_IMAGE_POINT p;
+		p.x		= v.x;
+		p.y		= v.y;
+		p.depth	= depth.getValue( v );
+		long hr = device->getCoordinateMapper()->MapDepthPointToColorPoint( 
+			device->getDeviceOptions().getDepthResolution(), &p, 
+			NUI_IMAGE_TYPE::NUI_IMAGE_TYPE_COLOR_INFRARED, 
+			device->getDeviceOptions().getColorResolution(), &mapped 
+			);
+		if ( FAILED( hr ) ) {
+			device->errorNui( hr );
+		}
+	}
+	return Vec2i( mapped.x, mapped.y );
 }
 
-Vec2i mapSkeletonCoordToDepth( const Vec3f& v, ImageResolution depthResolution )
+Vec2i mapSkeletonCoordToColor( const Vec3f& v, const DeviceRef& device )
 {
-	float x;
-	float y;
-	Vector4 pos;
-	pos.x = v.x;
-	pos.y = v.y;
-	pos.z = v.z;
-	pos.w = 1.0f;
-	NuiTransformSkeletonToDepthImage( pos, &x, &y, depthResolution );
-	return Vec2i( (int32_t)x, (int32_t)y );
+	NUI_COLOR_IMAGE_POINT mapped;
+	if ( device && device->getCoordinateMapper() ) {
+		Vector4 p;
+		p.x		= v.x;
+		p.y		= v.y;
+		p.z		= v.z;
+		p.w		= 0.0f;
+		long hr	= device->getCoordinateMapper()->MapSkeletonPointToColorPoint( 
+			&p, NUI_IMAGE_TYPE::NUI_IMAGE_TYPE_COLOR, 
+			device->getDeviceOptions().getColorResolution(), &mapped 
+			);
+		if ( FAILED( hr ) ) {
+			device->errorNui( hr );
+		}
+	}
+	return Vec2i( mapped.x, mapped.y );
+}
+
+Vec2i mapSkeletonCoordToDepth( const Vec3f& v, const DeviceRef& device )
+{
+	NUI_DEPTH_IMAGE_POINT mapped;
+	if ( device && device->getCoordinateMapper() ) {
+		Vector4 p;
+		p.x		= v.x;
+		p.y		= v.y;
+		p.z		= v.z;
+		p.w		= 0.0f;
+		long hr	= device->getCoordinateMapper()->MapSkeletonPointToDepthPoint( 
+			&p, device->getDeviceOptions().getDepthResolution(), &mapped 
+			);
+		if ( FAILED( hr ) ) {
+			device->errorNui( hr );
+		}
+	}
+	return Vec2i( mapped.x, mapped.y );
 }
 
 Matrix44f toMatrix44f( const Matrix4& m ) 
@@ -248,10 +287,12 @@ Matrix44f toMatrix44f( const Matrix4& m )
 		Vec4f( m.M31, m.M32, m.M33, m.M34 ), 
 		Vec4f( m.M41, m.M42, m.M43, m.M44 ) );
 }
+
 Quatf toQuatf( const Vector4& v ) 
 {
 	return Quatf( v.w, v.x, v.y, v.z );
 }
+
 Vec3f toVec3f( const Vector4& v ) 
 {
 	return Vec3f( v.x, v.y, v.z );
@@ -315,17 +356,11 @@ JointName Bone::getStartJoint() const
 //////////////////////////////////////////////////////////////////////////////////////////////
 
 DeviceOptions::DeviceOptions()
+: mDeviceId( "" ), mDeviceIndex( 0 ), mEnabledColor( true ), mEnabledDepth( true ),
+mEnabledInfrared( false ), mEnabledNearMode( false ), mEnabledSeatedMode( false ),
+mEnabledUserTracking( true ), mSkeletonTransform( SkeletonTransform::TRANSFORM_DEFAULT ),
+mSkeletonSelectionMode( SkeletonSelectionMode::SkeletonSelectionModeDefault )
 {
-	mDeviceId				= "";
-	mDeviceIndex			= 0;
-	mEnabledColor			= true;
-	mEnabledDepth			= true;
-	mEnabledInfrared		= false;
-	mEnabledNearMode		= false;
-	mEnabledSeatedMode		= false;
-	mEnabledUserTracking	= true;
-	mSkeletonTransform		= SkeletonTransform::TRANSFORM_DEFAULT;
-	mSkeletonSelectionMode	= SkeletonSelectionMode::SkeletonSelectionModeDefault;
 	setColorResolution( ImageResolution::NUI_IMAGE_RESOLUTION_640x480 );
 	setDepthResolution( ImageResolution::NUI_IMAGE_RESOLUTION_320x240 );
 	setInfraredResolution( ImageResolution::NUI_IMAGE_RESOLUTION_320x240 );
@@ -543,8 +578,8 @@ Frame::Frame()
 
 Frame::Frame( long long frameId, const std::string& deviceId, const Surface8u& color, 
 			 const Channel16u& depth, const Channel16u& infrared, const std::vector<Skeleton>& skeletons ) 
-	: mColorSurface( color ), mDepthChannel( depth ), mDeviceId( deviceId ), 
-	mFrameId( frameId ), mInfraredChannel( infrared ), mSkeletons( skeletons )
+: mColorSurface( color ), mDepthChannel( depth ), mDeviceId( deviceId ), 
+mFrameId( frameId ), mInfraredChannel( infrared ), mSkeletons( skeletons )
 {
 }
 
@@ -665,6 +700,11 @@ void Device::errorNui( long hr ) {
 	console() << endl;
 }
 
+INuiCoordinateMapper* Device::getCoordinateMapper() const
+{
+	return mCoordinateMapper;
+}
+
 const DeviceOptions& Device::getDeviceOptions() const
 {
 	return mDeviceOptions;
@@ -703,6 +743,7 @@ void Device::init( bool reset )
 	mBufferDepth		= nullptr;
 	mBufferInfrared		= nullptr;
 	mCapture			= false;
+	mCoordinateMapper	= 0;
 	mFrameId			= 0;
     mKinect				= KCB_INVALID_HANDLE;
 	mNuiSensor			= 0;
@@ -775,23 +816,25 @@ void Device::start( const DeviceOptions& deviceOptions )
 		}
 
         if ( mKinect == KCB_INVALID_HANDLE ) {
-			if ( index >= 0 ) {
-				console() << "Unable to create device instance " + toString( index ) + ": " << endl;
-			} else if ( deviceId.length() > 0 ) {
-				console() << "Unable to create device instance " + deviceId + ":" << endl;
-			} else {
-				console() << "Invalid device name or index." << endl;
-			}
 			errorNui( hr );
 			mDeviceOptions.setDeviceIndex( -1 );
 			mDeviceOptions.setDeviceId( "" );
-			return;
+			if ( index >= 0 ) {
+				console() << "Unable to create device instance " + toString( index ) + ": " << endl;
+				throw ExcDeviceCreate( hr, deviceId );
+			} else if ( deviceId.length() > 0 ) {
+				console() << "Unable to create device instance " + deviceId + ":" << endl;
+				throw ExcDeviceCreate( hr, deviceId );
+			} else {
+				console() << "Invalid device name or index." << endl;
+				throw ExcDeviceInvalid( hr, deviceId );
+			}
 		}
 
 		KINECT_SENSOR_STATUS status = KinectGetKinectSensorStatus( mKinect );
 		statusKinect( status );
 		if ( status > 1 ) {
-			return;
+			throw ExcDeviceInit( status, deviceId );
 		}
 		
 		if ( mDeviceOptions.isColorEnabled() && mDeviceOptions.getColorResolution() != ImageResolution::NUI_IMAGE_RESOLUTION_INVALID ) {
@@ -804,6 +847,7 @@ void Device::start( const DeviceOptions& deviceOptions )
 				mDeviceOptions.enableColor( false );
 				console() << "Unable to initialize color stream: ";
 				errorNui( hr );
+				throw ExcOpenStreamColor( hr, deviceId );
 			}
 		}
 
@@ -817,6 +861,7 @@ void Device::start( const DeviceOptions& deviceOptions )
 				mDeviceOptions.enableDepth( false );
 				console() << "Unable to initialize depth stream: ";
 				errorNui( hr );
+				throw ExcOpenStreamDepth( hr, deviceId );
 			}
 		}
 
@@ -830,6 +875,7 @@ void Device::start( const DeviceOptions& deviceOptions )
 				mDeviceOptions.enableInfrared( false );
 				console() << "Unable to initialize infrared stream: ";
 				errorNui( hr );
+				throw ExcOpenStreamInfrared( hr, deviceId );
 			}
 		}
 
@@ -842,6 +888,7 @@ void Device::start( const DeviceOptions& deviceOptions )
 				mDeviceOptions.enableUserTracking( false );
 				console() << "Unable to initialize user tracking: ";
 				errorNui( hr );
+				throw ExcUserTrackingEnable( hr, deviceId );
 			}
 		}
 
@@ -852,11 +899,18 @@ void Device::start( const DeviceOptions& deviceOptions )
 
 		hr = KinectStartStreams( mKinect );
 		if ( FAILED( hr ) ) {
-			mCapture = false;
 			console() << "Unable to start the streams: ";
 			errorNui( hr );
+			throw ExcStreamStart( hr, deviceId );
 		}
 
+		hr = mNuiSensor->NuiGetCoordinateMapper( &mCoordinateMapper );
+		if ( FAILED( hr ) ) {
+			console() << "Unable to initialize coordinate mapper: ";
+			errorNui( hr );
+			throw ExcGetCoordinateMapper( hr, deviceId );
+		}
+		
 		mCapture = true;
 	}
 }
@@ -1012,19 +1066,34 @@ Device::ExcDeviceInvalid::ExcDeviceInvalid( long hr, const string& id ) throw()
 	sprintf( mMessage, "Invalid device ID or index: %s. Error: %i", id, hr );
 }
 
-Device::ExcOpenStreamColor::ExcOpenStreamColor( long hr )
+Device::ExcGetCoordinateMapper::ExcGetCoordinateMapper( long hr, const string& id ) throw()
 {
-	sprintf( mMessage, "Unable to open color stream. Error: %i", hr );
+	sprintf( mMessage, "Unable to get coordinate mapper: %s. Error: %i", id, hr );
 }
 
-Device::ExcOpenStreamDepth::ExcOpenStreamDepth( long hr )
+Device::ExcOpenStreamColor::ExcOpenStreamColor( long hr, const string& id ) throw()
 {
-	sprintf( mMessage, "Unable to open depth stream. Error: %i", hr );
+	sprintf( mMessage, "Unable to open color stream: %s. Error: %i", hr );
 }
 
-Device::ExcSkeletonTrackingEnable::ExcSkeletonTrackingEnable( long hr )
+Device::ExcOpenStreamDepth::ExcOpenStreamDepth( long hr, const string& id ) throw()
 {
-	sprintf( mMessage, "Unable to enable skeleton tracking. Error: %i", hr );
+	sprintf( mMessage, "Unable to open depth stream. Error: %s: %i", hr );
+}
+
+Device::ExcOpenStreamInfrared::ExcOpenStreamInfrared( long hr, const string& id ) throw()
+{
+	sprintf( mMessage, "Unable to open infrared stream. Error: %s: %i", hr );
+}
+
+Device::ExcStreamStart::ExcStreamStart( long hr, const string& id ) throw()
+{
+	sprintf( mMessage, "Unable to start streams: %s. Error: %i", hr );
+}
+
+Device::ExcUserTrackingEnable::ExcUserTrackingEnable( long hr, const string& id ) throw()
+{
+	sprintf( mMessage, "Unable to enable user tracking: %s. Error: %i", hr );
 }
 }
  
