@@ -1010,7 +1010,7 @@ void Device::update()
 		for ( int32_t i = 0; i < NUI_SKELETON_COUNT; ++i ) {
 			mSkeletons.at( i ).clear();
 			NUI_SKELETON_TRACKING_STATE trackingState = skeletonFrame.SkeletonData[ i ].eTrackingState;
-			if ( trackingState == NUI_SKELETON_TRACKED || trackingState == NUI_SKELETON_POSITION_ONLY ) {
+			if ( trackingState == NUI_SKELETON_TRACKED ) {
 				_NUI_SKELETON_BONE_ORIENTATION bones[ NUI_SKELETON_POSITION_COUNT ];
 				long hr = NuiSkeletonCalculateBoneOrientations( skeletonFrame.SkeletonData + i, bones );
 				if ( FAILED( hr ) ) {
