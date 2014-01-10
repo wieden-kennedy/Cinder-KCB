@@ -189,15 +189,47 @@ size_t calcNumUsersFromDepth( const Channel16u& depth )
 	return users.size();
 }
 
-float calcSkeletonConfidence( const Skeleton& skeleton )
+float calcSkeletonConfidence( const Skeleton& skeleton, bool weighted )
 {
+	// TODO weighted
 	float c = 0.0f;
-	for ( Skeleton::const_iterator iter = skeleton.begin(); iter != skeleton.end(); ++iter ) {
-		if ( iter->second.getTrackingState() == JointTrackingState::NUI_SKELETON_POSITION_TRACKED ) {
-			c += 1.0f;
+	if ( weighted ) {
+		static map<JointName, float> weights;
+		if ( weights.empty() ) {
+			weights[ JointName::NUI_SKELETON_POSITION_HIP_CENTER ]		= 0.090909091f;
+			weights[ JointName::NUI_SKELETON_POSITION_SPINE ]			= 0.090909091f;
+			weights[ JointName::NUI_SKELETON_POSITION_SHOULDER_CENTER ]	= 0.090909091f;
+			weights[ JointName::NUI_SKELETON_POSITION_HEAD ]			= 0.045454545f;
+			weights[ JointName::NUI_SKELETON_POSITION_SHOULDER_LEFT ]	= 0.090909091f;
+			weights[ JointName::NUI_SKELETON_POSITION_ELBOW_LEFT ]		= 0.045454545f;
+			weights[ JointName::NUI_SKELETON_POSITION_WRIST_LEFT ]		= 0.022727273f;
+			weights[ JointName::NUI_SKELETON_POSITION_HAND_LEFT ]		= 0.011363636f;
+			weights[ JointName::NUI_SKELETON_POSITION_SHOULDER_RIGHT ]	= 0.090909091f;
+			weights[ JointName::NUI_SKELETON_POSITION_ELBOW_RIGHT ]		= 0.045454545f;
+			weights[ JointName::NUI_SKELETON_POSITION_WRIST_RIGHT ]		= 0.022727273f;
+			weights[ JointName::NUI_SKELETON_POSITION_HAND_RIGHT ]		= 0.011363636f;
+			weights[ JointName::NUI_SKELETON_POSITION_HIP_LEFT ]		= 0.090909091f;
+			weights[ JointName::NUI_SKELETON_POSITION_KNEE_LEFT ]		= 0.045454545f;
+			weights[ JointName::NUI_SKELETON_POSITION_ANKLE_LEFT ]		= 0.022727273f;
+			weights[ JointName::NUI_SKELETON_POSITION_FOOT_LEFT ]		= 0.011363636f;
+			weights[ JointName::NUI_SKELETON_POSITION_HIP_RIGHT ]		= 0.090909091f;
+			weights[ JointName::NUI_SKELETON_POSITION_KNEE_RIGHT ]		= 0.045454545f;
+			weights[ JointName::NUI_SKELETON_POSITION_ANKLE_RIGHT ]		= 0.022727273f;
+			weights[ JointName::NUI_SKELETON_POSITION_FOOT_RIGHT ]		= 0.011363636f;
 		}
+		for ( Skeleton::const_iterator iter = skeleton.begin(); iter != skeleton.end(); ++iter ) {
+			if ( iter->second.getTrackingState() == JointTrackingState::NUI_SKELETON_POSITION_TRACKED ) {
+				c += weights[ iter->first ];
+			}
+		}
+	} else {
+		for ( Skeleton::const_iterator iter = skeleton.begin(); iter != skeleton.end(); ++iter ) {
+			if ( iter->second.getTrackingState() == JointTrackingState::NUI_SKELETON_POSITION_TRACKED ) {
+				c += 1.0f;
+			}
+		}
+		c /= (float)JointName::NUI_SKELETON_POSITION_COUNT;
 	}
-	c /= (float)JointName::NUI_SKELETON_POSITION_COUNT;
 	return c;
 }
 
