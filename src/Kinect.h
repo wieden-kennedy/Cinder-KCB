@@ -59,11 +59,12 @@ namespace MsKinect
 {
 class Device;
 class DeviceOptions;
-typedef NUI_SKELETON_BONE_ROTATION		BoneRotation;
-typedef NUI_IMAGE_RESOLUTION			ImageResolution;
-typedef NUI_SKELETON_POSITION_INDEX		JointName;
-typedef KINECT_SKELETON_SELECTION_MODE	SkeletonSelectionMode;
-typedef std::shared_ptr<Device>			DeviceRef;
+typedef NUI_SKELETON_BONE_ROTATION				BoneRotation;
+typedef NUI_IMAGE_RESOLUTION					ImageResolution;
+typedef NUI_SKELETON_POSITION_INDEX				JointName;
+typedef NUI_SKELETON_POSITION_TRACKING_STATE	JointTrackingState;
+typedef KINECT_SKELETON_SELECTION_MODE			SkeletonSelectionMode;
+typedef std::shared_ptr<Device>					DeviceRef;
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -115,8 +116,10 @@ public:
 	const ci::Matrix44f&				getRotationMatrix() const;
 	//! Returns index of start joint.
 	JointName							getStartJoint() const;
+	//! Returns joint tracking state.
+	JointTrackingState					getTrackingState() const;
 private:
-	Bone( const Vector4& position, const _NUI_SKELETON_BONE_ORIENTATION& bone );
+	Bone( const Vector4& position, const _NUI_SKELETON_BONE_ORIENTATION& bone, JointTrackingState trackingState );
 	ci::Matrix44f						mAbsRotMat;
 	ci::Quatf							mAbsRotQuat;
 	JointName							mJointEnd;
@@ -124,6 +127,7 @@ private:
 	ci::Vec3f							mPosition;
 	ci::Matrix44f						mRotMat;
 	ci::Quatf							mRotQuat;
+	JointTrackingState					mTrackingState;
 
 	friend class						Device;
 };

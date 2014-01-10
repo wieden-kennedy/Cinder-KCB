@@ -116,15 +116,16 @@ bool DepthProcessOptions::isUserColorEnabled() const
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 
-Bone::Bone( const Vector4& position, const _NUI_SKELETON_BONE_ORIENTATION& bone )
+Bone::Bone( const Vector4& position, const _NUI_SKELETON_BONE_ORIENTATION& bone, JointTrackingState trackingState )
 {
-	mAbsRotQuat	= toQuatf( bone.absoluteRotation.rotationQuaternion );
-	mAbsRotMat	= toMatrix44f( bone.absoluteRotation.rotationMatrix );
-	mJointEnd	= bone.endJoint;
-	mJointStart	= bone.startJoint;
-	mPosition	= toVec3f( position );
-	mRotQuat	= toQuatf( bone.hierarchicalRotation.rotationQuaternion );
-	mRotMat		= toMatrix44f( bone.hierarchicalRotation.rotationMatrix );
+	mAbsRotQuat		= toQuatf( bone.absoluteRotation.rotationQuaternion );
+	mAbsRotMat		= toMatrix44f( bone.absoluteRotation.rotationMatrix );
+	mJointEnd		= bone.endJoint;
+	mJointStart		= bone.startJoint;
+	mPosition		= toVec3f( position );
+	mRotQuat		= toQuatf( bone.hierarchicalRotation.rotationQuaternion );
+	mRotMat			= toMatrix44f( bone.hierarchicalRotation.rotationMatrix );
+	mTrackingState	= trackingState;
 }
 
 const Quatf& Bone::getAbsoluteRotation() const 
@@ -162,6 +163,11 @@ JointName Bone::getStartJoint() const
 	return mJointStart;
 }
 
+JointTrackingState Bone::getTrackingState() const
+{
+	return mTrackingState;
+}
+
 //////////////////////////////////////////////////////////////////////////////////////////////
 
 size_t calcNumUsersFromDepth( const Channel16u& depth )
@@ -187,9 +193,7 @@ float calcSkeletonConfidence( const Skeleton& skeleton, const DeviceRef& device 
 {
 	float c = 0.0f;
 	for ( Skeleton::const_iterator iter = skeleton.begin(); iter != skeleton.end(); ++iter ) {
-		Vec2i v = mapSkeletonCoordToDepth( iter->second.getPosition(), device );
-		if ( v.x >= 0 && v.x < device->getDeviceOptions().getDepthSize().x &&
-			 v.y >= 0 && v.y < device->getDeviceOptions().getDepthSize().y ) {
+		if ( iter->second.getTrackingState() == JointTrackingState::NUI_SKELETON_POSITION_TRACKED ) {
 			c += 1.0f;
 		}
 	}
@@ -1032,15 +1036,18 @@ void Device::update()
 		for ( int32_t i = 0; i < NUI_SKELETON_COUNT; ++i ) {
 			mSkeletons.at( i ).clear();
 			NUI_SKELETON_TRACKING_STATE trackingState = skeletonFrame.SkeletonData[ i ].eTrackingState;
+
 			if ( trackingState == NUI_SKELETON_TRACKED ) {
 				_NUI_SKELETON_BONE_ORIENTATION bones[ NUI_SKELETON_POSITION_COUNT ];
 				long hr = NuiSkeletonCalculateBoneOrientations( skeletonFrame.SkeletonData + i, bones );
 				if ( FAILED( hr ) ) {
 					errorNui( hr );
 				}
-
 				for ( int32_t j = 0; j < (int32_t)NUI_SKELETON_POSITION_COUNT; ++j ) {
-					Bone bone( *( ( skeletonFrame.SkeletonData + i )->SkeletonPositions + j ), *( bones + j ) );
+					JointTrackingState trackingState = skeletonFrame.SkeletonData[ i ].eSkeletonPositionTrackingState[ j ];
+					Bone bone( *( ( skeletonFrame.SkeletonData + i )->SkeletonPositions + j ), 
+							   *( bones + j ), 
+							   trackingState );
 					( mSkeletons.begin() + i )->insert( std::pair<JointName, Bone>( (JointName)j, bone ) );
 				}
 			}
