@@ -49,6 +49,26 @@ using namespace std;
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 
+Matrix44f toMatrix44f( const Matrix4& m ) 
+{
+	return Matrix44f( Vec4f( m.M11, m.M12, m.M13, m.M14 ), 
+		Vec4f( m.M21, m.M22, m.M23, m.M24 ), 
+		Vec4f( m.M31, m.M32, m.M33, m.M34 ), 
+		Vec4f( m.M41, m.M42, m.M43, m.M44 ) );
+}
+
+Quatf toQuatf( const Vector4& v ) 
+{
+	return Quatf( v.w, v.x, v.y, v.z );
+}
+
+Vec3f toVec3f( const Vector4& v ) 
+{
+	return Vec3f( v.x, v.y, v.z );
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+
 DepthProcessOptions::DepthProcessOptions()
 	: mBinary( false ), mBinaryInverted( false ), mRemoveBackground( false ), mUserColor( false )
 {
@@ -96,6 +116,54 @@ bool DepthProcessOptions::isUserColorEnabled() const
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 
+Bone::Bone( const Vector4& position, const _NUI_SKELETON_BONE_ORIENTATION& bone )
+{
+	mAbsRotQuat	= toQuatf( bone.absoluteRotation.rotationQuaternion );
+	mAbsRotMat	= toMatrix44f( bone.absoluteRotation.rotationMatrix );
+	mJointEnd	= bone.endJoint;
+	mJointStart	= bone.startJoint;
+	mPosition	= toVec3f( position );
+	mRotQuat	= toQuatf( bone.hierarchicalRotation.rotationQuaternion );
+	mRotMat		= toMatrix44f( bone.hierarchicalRotation.rotationMatrix );
+}
+
+const Quatf& Bone::getAbsoluteRotation() const 
+{ 
+	return mAbsRotQuat; 
+}
+
+const Matrix44f& Bone::getAbsoluteRotationMatrix() const 
+{ 
+	return mAbsRotMat; 
+}
+
+JointName Bone::getEndJoint() const
+{
+	return mJointEnd;
+}
+
+const Vec3f& Bone::getPosition() const 
+{ 
+	return mPosition; 
+}
+
+const Quatf& Bone::getRotation() const 
+{ 
+	return mRotQuat; 
+}
+
+const Matrix44f& Bone::getRotationMatrix() const 
+{ 
+	return mRotMat; 
+}
+
+JointName Bone::getStartJoint() const
+{
+	return mJointStart;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+
 size_t calcNumUsersFromDepth( const Channel16u& depth )
 {
 	if ( !depth ) {
@@ -113,6 +181,20 @@ size_t calcNumUsersFromDepth( const Channel16u& depth )
 		}
 	}
 	return users.size();
+}
+
+float calcSkeletonConfidence( const Skeleton& skeleton, const DeviceRef& device )
+{
+	float c = 0.0f;
+	for ( Skeleton::const_iterator iter = skeleton.begin(); iter != skeleton.end(); ++iter ) {
+		Vec2i v = mapSkeletonCoordToDepth( iter->second.getPosition(), device );
+		if ( v.x >= 0 && v.x < device->getDeviceOptions().getDepthSize().x &&
+			 v.y >= 0 && v.y < device->getDeviceOptions().getDepthSize().y ) {
+			c += 1.0f;
+		}
+	}
+	c /= (float)JointName::NUI_SKELETON_POSITION_COUNT;
+	return c;
 }
 
 Surface16u depthChannelToSurface( const Channel16u& depth, const DepthProcessOptions& depthProcessOptions )
@@ -280,24 +362,6 @@ Vec2i mapSkeletonCoordToDepth( const Vec3f& v, const DeviceRef& device )
 	return Vec2i( mapped.x, mapped.y );
 }
 
-Matrix44f toMatrix44f( const Matrix4& m ) 
-{
-	return Matrix44f( Vec4f( m.M11, m.M12, m.M13, m.M14 ), 
-		Vec4f( m.M21, m.M22, m.M23, m.M24 ), 
-		Vec4f( m.M31, m.M32, m.M33, m.M34 ), 
-		Vec4f( m.M41, m.M42, m.M43, m.M44 ) );
-}
-
-Quatf toQuatf( const Vector4& v ) 
-{
-	return Quatf( v.w, v.x, v.y, v.z );
-}
-
-Vec3f toVec3f( const Vector4& v ) 
-{
-	return Vec3f( v.x, v.y, v.z );
-}
-
 uint16_t userIdFromDepthCoord( const Channel16u& depth, const Vec2i& v )
 {
 	return NuiDepthPixelToPlayerIndex( depth.getValue( v ) );
@@ -310,48 +374,6 @@ const NUI_TRANSFORM_SMOOTH_PARAMETERS	kTransformVerySmooth	= { 0.7f, 0.3f, 1.0f,
 const NUI_TRANSFORM_SMOOTH_PARAMETERS	kTransformMax			= { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
 const NUI_TRANSFORM_SMOOTH_PARAMETERS	kTransformParams[ 5 ]	= 
 { kTransformNone, kTransformDefault, kTransformSmooth, kTransformVerySmooth, kTransformMax };
-
-//////////////////////////////////////////////////////////////////////////////////////////////
-
-Bone::Bone( const Vector4& position, const _NUI_SKELETON_BONE_ORIENTATION& bone )
-{
-	mAbsRotQuat	= toQuatf( bone.absoluteRotation.rotationQuaternion );
-	mAbsRotMat	= toMatrix44f( bone.absoluteRotation.rotationMatrix );
-	mJointEnd	= bone.endJoint;
-	mJointStart	= bone.startJoint;
-	mPosition	= toVec3f( position );
-	mRotQuat	= toQuatf( bone.hierarchicalRotation.rotationQuaternion );
-	mRotMat		= toMatrix44f( bone.hierarchicalRotation.rotationMatrix );
-}
-
-const Quatf& Bone::getAbsoluteRotation() const 
-{ 
-	return mAbsRotQuat; 
-}
-const Matrix44f& Bone::getAbsoluteRotationMatrix() const 
-{ 
-	return mAbsRotMat; 
-}
-JointName Bone::getEndJoint() const
-{
-	return mJointEnd;
-}
-const Vec3f& Bone::getPosition() const 
-{ 
-	return mPosition; 
-}
-const Quatf& Bone::getRotation() const 
-{ 
-	return mRotQuat; 
-}
-const Matrix44f& Bone::getRotationMatrix() const 
-{ 
-	return mRotMat; 
-}
-JointName Bone::getStartJoint() const
-{
-	return mJointStart;
-}
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 

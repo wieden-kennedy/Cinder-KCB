@@ -151,7 +151,7 @@ void HandTracker::run()
 						vector<Vec2i> fingers;
 						const Bone& bone		= boneIt->second;
 						const Vec3f& handPos	= bone.getPosition();
-						Vec2i centroid			= mapSkeletonCoordToDepth( handPos, mImageResolution);
+						Vec2i centroid			= mapSkeletonCoordToDepth( handPos, mImageResolution );
 						Vec3f palm( (float)centroid.x, (float)centroid.y, getDepthAtCoord( mDepthChannel, centroid ) );
 
 						float radius			= (float)mImageSize.y * 0.2f;

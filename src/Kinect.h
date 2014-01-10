@@ -98,41 +98,6 @@ protected:
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 
-//! Counts the number of users in \a depth.
-size_t									calcNumUsersFromDepth( const ci::Channel16u& depth );
-//! Creates a surface with colorized users from \a depth.
-ci::Surface16u							depthChannelToSurface( const ci::Channel16u& depth, 
-															  const DepthProcessOptions& depthProcessOptions = DepthProcessOptions() );
-//! Returns depth value as 0.0 - 1.0 float for pixel at \a pos.
-float									getDepthAtCoord( const ci::Channel16u& depth, const ci::Vec2i& v );
-//! Returns number of Kinect devices.
-size_t									getDeviceCount();
-//! Returns use color for user ID \a id.
-ci::Colorf								getUserColor( uint32_t id );
-//! Returns pixel location of color position in depth image.
-ci::Vec2i								mapColorCoordToDepth( const ci::Vec2i& v, const ci::Channel16u& depth, 
-															  const DeviceRef& device );
-//! Returns pixel location of color position in depth image.
-ci::Vec2i								mapDepthCoordToColor( const ci::Vec2i& v, const ci::Channel16u& depth, 
-															  const DeviceRef& device );
-//! Returns pixel location of skeleton position in color image. Requires depth resolution.
-ci::Vec2i								mapSkeletonCoordToColor( const ci::Vec3f& v, const DeviceRef& device );
-//! Returns pixel location of skeleton position in depth image.
-ci::Vec2i								mapSkeletonCoordToDepth( const ci::Vec3f& v, const DeviceRef& device );
-//! Returns user ID for pixel at \a coord in \a depth. 0 is no user.
-uint16_t								userIdFromDepthCoord( const ci::Channel16u& depth, const ci::Vec2i& v );
-
-//////////////////////////////////////////////////////////////////////////////////////////////
-
-/*! Skeleton smoothing enumeration. Smoother transform improves skeleton accuracy, 
-	but increases latency. */
-enum : uint_fast8_t
-{
-	TRANSFORM_NONE, TRANSFORM_DEFAULT, TRANSFORM_SMOOTH, TRANSFORM_VERY_SMOOTH, TRANSFORM_MAX
-} typedef								SkeletonTransform;
-
-//////////////////////////////////////////////////////////////////////////////////////////////
-
 class Bone
 {
 public:
@@ -163,6 +128,43 @@ private:
 	friend class						Device;
 };
 typedef std::map<JointName, Bone>		Skeleton;
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+
+//! Counts the number of users in \a depth.
+size_t									calcNumUsersFromDepth( const ci::Channel16u& depth );
+//! Calculates confidence of \a skeleton between 0.0 and 1.0.
+float									calcSkeletonConfidence( const Skeleton& skeleton, const DeviceRef& device );
+//! Creates a surface with colorized users from \a depth.
+ci::Surface16u							depthChannelToSurface( const ci::Channel16u& depth, 
+															  const DepthProcessOptions& depthProcessOptions = DepthProcessOptions() );
+//! Returns depth value as 0.0 - 1.0 float for pixel at \a pos.
+float									getDepthAtCoord( const ci::Channel16u& depth, const ci::Vec2i& v );
+//! Returns number of Kinect devices.
+size_t									getDeviceCount();
+//! Returns use color for user ID \a id.
+ci::Colorf								getUserColor( uint32_t id );
+//! Returns pixel location of color position in depth image.
+ci::Vec2i								mapColorCoordToDepth( const ci::Vec2i& v, const ci::Channel16u& depth, 
+															  const DeviceRef& device );
+//! Returns pixel location of color position in depth image.
+ci::Vec2i								mapDepthCoordToColor( const ci::Vec2i& v, const ci::Channel16u& depth, 
+															  const DeviceRef& device );
+//! Returns pixel location of skeleton position in color image. Requires depth resolution.
+ci::Vec2i								mapSkeletonCoordToColor( const ci::Vec3f& v, const DeviceRef& device );
+//! Returns pixel location of skeleton position in depth image.
+ci::Vec2i								mapSkeletonCoordToDepth( const ci::Vec3f& v, const DeviceRef& device );
+//! Returns user ID for pixel at \a coord in \a depth. 0 is no user.
+uint16_t								userIdFromDepthCoord( const ci::Channel16u& depth, const ci::Vec2i& v );
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+
+/*! Skeleton smoothing enumeration. Smoother transform improves skeleton accuracy, 
+	but increases latency. */
+enum : uint_fast8_t
+{
+	TRANSFORM_NONE, TRANSFORM_DEFAULT, TRANSFORM_SMOOTH, TRANSFORM_VERY_SMOOTH, TRANSFORM_MAX
+} typedef								SkeletonTransform;
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 
