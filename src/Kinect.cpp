@@ -219,7 +219,7 @@ float calcSkeletonConfidence( const Skeleton& skeleton, bool weighted )
 		}
 		for ( Skeleton::const_iterator iter = skeleton.begin(); iter != skeleton.end(); ++iter ) {
 			if ( iter->second.getTrackingState() == JointTrackingState::NUI_SKELETON_POSITION_TRACKED ) {
-				c += weights[ iter->first ];
+				c += weights.at( iter->first );
 			}
 		}
 	} else {
