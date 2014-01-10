@@ -138,7 +138,7 @@ typedef std::map<JointName, Bone>		Skeleton;
 //! Counts the number of users in \a depth.
 size_t									calcNumUsersFromDepth( const ci::Channel16u& depth );
 //! Calculates confidence of \a skeleton between 0.0 and 1.0.
-float									calcSkeletonConfidence( const Skeleton& skeleton, const DeviceRef& device );
+float									calcSkeletonConfidence( const Skeleton& skeleton );
 //! Creates a surface with colorized users from \a depth.
 ci::Surface16u							depthChannelToSurface( const ci::Channel16u& depth, 
 															  const DepthProcessOptions& depthProcessOptions = DepthProcessOptions() );

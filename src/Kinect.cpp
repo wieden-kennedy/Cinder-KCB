@@ -189,7 +189,7 @@ size_t calcNumUsersFromDepth( const Channel16u& depth )
 	return users.size();
 }
 
-float calcSkeletonConfidence( const Skeleton& skeleton, const DeviceRef& device )
+float calcSkeletonConfidence( const Skeleton& skeleton )
 {
 	float c = 0.0f;
 	for ( Skeleton::const_iterator iter = skeleton.begin(); iter != skeleton.end(); ++iter ) {
