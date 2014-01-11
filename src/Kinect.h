@@ -427,6 +427,13 @@ public:
 		ExcDeviceInvalid( long hr, const std::string& id ) throw();
 	};
 
+	//! Exception representing a lack of attached devices.
+	class ExcDeviceUnavailable : public Exception 
+	{
+	public:
+		ExcDeviceUnavailable() throw();
+	};
+
 	//! Exception representing attempt to get coordinate mapper.
 	class ExcGetCoordinateMapper : public Exception 
 	{

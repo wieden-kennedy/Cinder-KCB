@@ -852,6 +852,11 @@ void Device::start( const DeviceOptions& deviceOptions )
 			index = math<int32_t>::clamp( index, 0, math<int32_t>::max( getDeviceCount() - 1, 0 ) );
 		}
 
+		if ( getDeviceCount() == 0 ) {
+			console( ) << "No devices available" << endl;
+			throw ExcDeviceUnavailable();
+		}
+
 		wchar_t portId[ KINECT_MAX_PORTID_LENGTH ];
 		size_t count = KinectGetPortIDCount();
 		if ( index >= 0 ) {
@@ -873,7 +878,7 @@ void Device::start( const DeviceOptions& deviceOptions )
 			}
 		}
 
-        if ( mKinect == KCB_INVALID_HANDLE ) {
+        if ( mKinect == KCB_INVALID_HANDLE || mNuiSensor == 0 ) {
 			errorNui( hr );
 			mDeviceOptions.setDeviceIndex( -1 );
 			mDeviceOptions.setDeviceId( "" );
@@ -1125,6 +1130,11 @@ Device::ExcDeviceInit::ExcDeviceInit( long hr, const string& id ) throw()
 Device::ExcDeviceInvalid::ExcDeviceInvalid( long hr, const string& id ) throw()
 {
 	sprintf( mMessage, "Invalid device ID or index: %s. Error: %i", id, hr );
+}
+
+Device::ExcDeviceUnavailable::ExcDeviceUnavailable() throw()
+{
+	sprintf( mMessage, "No device available." );
 }
 
 Device::ExcGetCoordinateMapper::ExcGetCoordinateMapper( long hr, const string& id ) throw()
