@@ -49,7 +49,7 @@ FaceTracker::Face::Face()
 	mUserId = 0;
 }
 
-const FaceTracker::AnimationUnitMap& FaceTracker::Face::getAnimationUnits() const
+const AnimationUnitMap& FaceTracker::Face::getAnimationUnits() const
 {
 	return mAnimationUnits;
 }
@@ -59,12 +59,12 @@ const Rectf& FaceTracker::Face::getBounds() const
 	return mBounds;
 }
 
-const TriMesh& FaceTracker::Face::getMesh() const
+const TriMeshRef& FaceTracker::Face::getMesh() const
 {
 	return mMesh;
 }
 
-const TriMesh2d& FaceTracker::Face::getMesh2d() const
+const TriMeshRef& FaceTracker::Face::getMesh2d() const
 {
 	return mMesh2d;
 }
@@ -268,12 +268,10 @@ void FaceTracker::run()
 		if ( !mNewFace ) {
 			long hr = S_OK;
 
-			mFace.mAnimationUnits.clear();
-			mFace.mBounds = Rectf( 0.0f, 0.0f, 0.0f, 0.0f );
-			mFace.mMesh.clear();
-			mFace.mMesh2d.clear();
-			mFace.mPoseMatrix.setToIdentity();
-			mFace.mUserId = mUserId;
+			Face face;
+			face.mBounds = Rectf( 0.0f, 0.0f, 0.0f, 0.0f );
+			face.mPoseMatrix.setToIdentity();
+			face.mUserId = mUserId;
 
 			FT_VECTOR3D* hint = 0;
 			if ( mHeadPoints.size() == 2 ) {
@@ -299,17 +297,17 @@ void FaceTracker::run()
 				hr = mFaceTracker->GetFaceModel( &mModel );
 
 				if ( SUCCEEDED( hr ) ) {
-					float* shapeUnits		= 0;
-					size_t numShapeUnits	= 0;
+					float* shapeUnits	= 0;
+					UINT numShapeUnits	= 0;
 					int32_t haveConverged	= false;
 					mFaceTracker->GetShapeUnits( 0, &shapeUnits, &numShapeUnits, &haveConverged );
 							
-					float* animationUnits;
-					size_t numAnimationUnits;
+					float* animationUnits	= 0;
+					UINT numAnimationUnits	= 0;
 					hr = mResult->GetAUCoefficients( &animationUnits, &numAnimationUnits );
 					if ( SUCCEEDED( hr ) ) {
 						for ( size_t i = 0; i < numAnimationUnits; ++i ) {
-							mFace.mAnimationUnits[ (AnimationUnit)i ] = animationUnits[ i ];
+							face.mAnimationUnits[ (AnimationUnit)i ] = animationUnits[ i ];
 						}
 					}
 
@@ -321,11 +319,11 @@ void FaceTracker::run()
 						Vec3f r( rotation[ 0 ], rotation[ 1 ], rotation[ 2 ] );
 						Vec3f t( translation[ 0 ], translation[ 1 ], translation[ 2 ] );
 
-						mFace.mPoseMatrix.translate( t );
-						mFace.mPoseMatrix.rotate( r );
-						mFace.mPoseMatrix.translate( -t );
-						mFace.mPoseMatrix.translate( t );
-						mFace.mPoseMatrix.scale( Vec3f::one() * scale );
+						face.mPoseMatrix.translate( t );
+						face.mPoseMatrix.rotate( r );
+						face.mPoseMatrix.translate( -t );
+						face.mPoseMatrix.translate( t );
+						face.mPoseMatrix.scale( Vec3f::one() * scale );
 					}
 
 					size_t numVertices	= mModel->GetVertexCount();
@@ -338,15 +336,15 @@ void FaceTracker::run()
 							if ( SUCCEEDED( hr ) ) {
 								for ( size_t i = 0; i < numVertices; ++i ) {
 									Vec3f v( pts[ i ].x, pts[ i ].y, pts[ i ].z );
-									mFace.mMesh.appendVertex( v );
+									face.mMesh->appendVertex( v );
 								}
 
-								FT_TRIANGLE* triangles;
-								size_t triangleCount;
+								FT_TRIANGLE* triangles	= 0;
+								UINT triangleCount		= 0;
 								hr = mModel->GetTriangles( &triangles, &triangleCount );
 								if ( SUCCEEDED( hr ) ) {
 									for ( size_t i = 0; i < triangleCount; ++i ) {
-										mFace.mMesh.appendTriangle( triangles[ i ].i, triangles[ i ].j, triangles[ i ].k );
+										face.mMesh->appendTriangle( triangles[ i ].i, triangles[ i ].j, triangles[ i ].k );
 									}
 								}
 							}
@@ -362,15 +360,15 @@ void FaceTracker::run()
 							if ( SUCCEEDED( hr ) ) {
 								for ( size_t i = 0; i < numVertices; ++i ) {
 									Vec2f v( pts[ i ].x + 0.5f, pts[ i ].y + 0.5f );
-									mFace.mMesh2d.appendVertex( v );
+									face.mMesh2d->appendVertex( v );
 								}
 
-								FT_TRIANGLE* triangles;
-								size_t triangleCount;
+								FT_TRIANGLE* triangles	= 0;
+								UINT triangleCount		= 0;
 								hr = mModel->GetTriangles( &triangles, &triangleCount );
 								if ( SUCCEEDED( hr ) ) {
 									for ( size_t i = 0; i < triangleCount; ++i ) {
-										mFace.mMesh2d.appendTriangle( triangles[ i ].i, triangles[ i ].j, triangles[ i ].k );
+										face.mMesh2d->appendTriangle( triangles[ i ].i, triangles[ i ].j, triangles[ i ].k );
 									}
 								}
 							}
@@ -381,14 +379,15 @@ void FaceTracker::run()
 					tagRECT rect;
 					hr = mResult->GetFaceRect( &rect );
 					if ( SUCCEEDED( hr ) ) {
-						mFace.mBounds = Rectf( (float)rect.left, (float)rect.top, (float)rect.right, (float)rect.bottom );
+						face.mBounds = Rectf( (float)rect.left, (float)rect.top, (float)rect.right, (float)rect.bottom );
 					}
 				}
 			} else {
 				mResult->Reset();
 			}
 
-			mNewFace = true;
+			mFace		= face;
+			mNewFace	= true;
 		}
 	}
 }

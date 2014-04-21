@@ -187,6 +187,8 @@ public:
 	ImageResolution						getDepthResolution() const; 
 	//! Returns size of depth image.
 	const ci::Vec2i&					getDepthSize() const;
+	//! Returns KCB handle for this device.
+	KCBHANDLE							getDeviceHandle() const;
 	//! Returns unique ID for this device.
 	const std::string&					getDeviceId() const;
 	//! Returns 0-index for this device.
@@ -260,6 +262,9 @@ protected:
 
 	std::string							mDeviceId;
 	int32_t								mDeviceIndex;
+	KCBHANDLE							mDeviceHandle;
+
+	friend class						Device;
 };
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -363,7 +368,6 @@ protected:
 	DeviceOptions						mDeviceOptions;
 	
 	INuiCoordinateMapper*				mCoordinateMapper;
-	KCBHANDLE							mKinect;
 	INuiSensor*							mNuiSensor;
 
 	uint8_t*							mBufferColor;

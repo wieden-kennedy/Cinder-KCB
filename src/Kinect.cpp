@@ -403,19 +403,19 @@ uint16_t userIdFromDepthCoord( const Channel16u& depth, const Vec2i& v )
 	return NuiDepthPixelToPlayerIndex( depth.getValue( v ) );
 }
 
-const NUI_TRANSFORM_SMOOTH_PARAMETERS	kTransformNone			= { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
-const NUI_TRANSFORM_SMOOTH_PARAMETERS	kTransformDefault		= { 0.5f, 0.5f, 0.5f, 0.05f, 0.04f };
-const NUI_TRANSFORM_SMOOTH_PARAMETERS	kTransformSmooth		= { 0.5f, 0.1f, 0.5f, 0.1f, 0.1f };
-const NUI_TRANSFORM_SMOOTH_PARAMETERS	kTransformVerySmooth	= { 0.7f, 0.3f, 1.0f, 1.0f, 1.0f };
-const NUI_TRANSFORM_SMOOTH_PARAMETERS	kTransformMax			= { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
-const NUI_TRANSFORM_SMOOTH_PARAMETERS	kTransformParams[ 5 ]	= 
+NUI_TRANSFORM_SMOOTH_PARAMETERS	kTransformNone			= { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
+NUI_TRANSFORM_SMOOTH_PARAMETERS	kTransformDefault		= { 0.5f, 0.5f, 0.5f, 0.05f, 0.04f };
+NUI_TRANSFORM_SMOOTH_PARAMETERS	kTransformSmooth		= { 0.5f, 0.1f, 0.5f, 0.1f, 0.1f };
+NUI_TRANSFORM_SMOOTH_PARAMETERS	kTransformVerySmooth	= { 0.7f, 0.3f, 1.0f, 1.0f, 1.0f };
+NUI_TRANSFORM_SMOOTH_PARAMETERS	kTransformMax			= { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
+NUI_TRANSFORM_SMOOTH_PARAMETERS	kTransformParams[ 5 ]	= 
 { kTransformNone, kTransformDefault, kTransformSmooth, kTransformVerySmooth, kTransformMax };
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 
 DeviceOptions::DeviceOptions()
-: mDeviceId( "" ), mDeviceIndex( 0 ), mEnabledColor( true ), mEnabledDepth( true ),
-mEnabledInfrared( false ), mEnabledNearMode( false ), mEnabledSeatedMode( false ),
+: mDeviceHandle( KCB_INVALID_HANDLE ), mDeviceId( "" ), mDeviceIndex( 0 ), mEnabledColor( true ), 
+mEnabledDepth( true ), mEnabledInfrared( false ), mEnabledNearMode( false ), mEnabledSeatedMode( false ),
 mEnabledUserTracking( true ), mSkeletonTransform( SkeletonTransform::TRANSFORM_DEFAULT ),
 mSkeletonSelectionMode( SkeletonSelectionMode::SkeletonSelectionModeDefault )
 {
@@ -478,6 +478,11 @@ ImageResolution DeviceOptions::getDepthResolution() const
 const Vec2i& DeviceOptions::getDepthSize() const
 {
 	return mDepthSize;
+}
+
+KCBHANDLE DeviceOptions::getDeviceHandle() const
+{
+	return mDeviceHandle;
 }
 
 const string& DeviceOptions::getDeviceId() const
@@ -803,7 +808,6 @@ void Device::init( bool reset )
 	mCapture			= false;
 	mCoordinateMapper	= 0;
 	mFrameId			= 0;
-    mKinect				= KCB_INVALID_HANDLE;
 	mNuiSensor			= 0;
 	mIsSkeletonDevice	= false;
 	mTiltRequestTime	= 0.0;
@@ -861,8 +865,8 @@ void Device::start( const DeviceOptions& deviceOptions )
 		size_t count = KinectGetPortIDCount();
 		if ( index >= 0 ) {
 			if ( KinectGetPortIDByIndex( index, _countof( portId ), portId ) ) {
-				mKinect = KinectOpenSensor( portId );
-				hr		= NuiCreateSensorById( portId, &mNuiSensor );
+				mDeviceOptions.mDeviceHandle	= KinectOpenSensor( portId );
+				hr								= NuiCreateSensorById( portId, &mNuiSensor );
 				mDeviceOptions.setDeviceId( wcharToString( portId ) );
 			}
 		} else if ( deviceId.length() > 0 ) {
@@ -870,7 +874,7 @@ void Device::start( const DeviceOptions& deviceOptions )
 			hr = NuiCreateSensorById( id, &mNuiSensor );
 			for ( size_t i = 0; i < count; ++i ) {
 				if ( deviceId == wcharToString( portId ) && KinectGetPortIDByIndex( i, _countof( portId ), portId ) ) {
-					mKinect = KinectOpenSensor( portId );
+					mDeviceOptions.mDeviceHandle	= KinectOpenSensor( portId );
 					hr		= NuiCreateSensorById( portId, &mNuiSensor );
 					mDeviceOptions.setDeviceIndex( i );
 					break;
@@ -878,7 +882,7 @@ void Device::start( const DeviceOptions& deviceOptions )
 			}
 		}
 
-        if ( mKinect == KCB_INVALID_HANDLE || mNuiSensor == 0 ) {
+        if ( mDeviceOptions.getDeviceHandle() == KCB_INVALID_HANDLE || mNuiSensor == 0 ) {
 			errorNui( hr );
 			mDeviceOptions.setDeviceIndex( -1 );
 			mDeviceOptions.setDeviceId( "" );
@@ -894,7 +898,7 @@ void Device::start( const DeviceOptions& deviceOptions )
 			}
 		}
 
-		KINECT_SENSOR_STATUS status = KinectGetKinectSensorStatus( mKinect );
+		KINECT_SENSOR_STATUS status = KinectGetKinectSensorStatus( mDeviceOptions.getDeviceHandle() );
 		statusKinect( status );
 		if ( status > 1 ) {
 			throw ExcDeviceInit( status, deviceId );
@@ -903,8 +907,8 @@ void Device::start( const DeviceOptions& deviceOptions )
 		if ( mDeviceOptions.isColorEnabled() && mDeviceOptions.getColorResolution() != ImageResolution::NUI_IMAGE_RESOLUTION_INVALID ) {
 			KINECT_IMAGE_FRAME_FORMAT format	= { sizeof( KINECT_IMAGE_FRAME_FORMAT ), 0 };
 			mFormatColor						= format;
-			KinectEnableColorStream( mKinect, mDeviceOptions.getColorResolution(), &mFormatColor );
-            if ( KinectGetColorStreamStatus( mKinect ) != KINECT_STREAM_STATUS::KinectStreamStatusError ) {
+			KinectEnableColorStream( mDeviceOptions.getDeviceHandle(), mDeviceOptions.getColorResolution(), &mFormatColor );
+            if ( KinectGetColorStreamStatus( mDeviceOptions.getDeviceHandle() ) != KINECT_STREAM_STATUS::KinectStreamStatusError ) {
 				mBufferColor					= new uint8_t[ mFormatColor.cbBufferSize ];
 			} else {
 				mDeviceOptions.enableColor( false );
@@ -917,8 +921,8 @@ void Device::start( const DeviceOptions& deviceOptions )
 		if ( mDeviceOptions.isDepthEnabled() && mDeviceOptions.getDepthResolution() != ImageResolution::NUI_IMAGE_RESOLUTION_INVALID ) {
 			KINECT_IMAGE_FRAME_FORMAT format	= { sizeof( KINECT_IMAGE_FRAME_FORMAT ), 0 };
 			mFormatDepth						= format;
-			KinectEnableDepthStream( mKinect, mDeviceOptions.isNearModeEnabled(), mDeviceOptions.getDepthResolution(), &mFormatDepth );
-            if ( KinectGetDepthStreamStatus( mKinect ) != KINECT_STREAM_STATUS::KinectStreamStatusError ) {
+			KinectEnableDepthStream( mDeviceOptions.getDeviceHandle(), mDeviceOptions.isNearModeEnabled(), mDeviceOptions.getDepthResolution(), &mFormatDepth );
+            if ( KinectGetDepthStreamStatus( mDeviceOptions.getDeviceHandle() ) != KINECT_STREAM_STATUS::KinectStreamStatusError ) {
 				mBufferDepth					= new uint8_t[ mFormatDepth.cbBufferSize ];
 			} else {
 				mDeviceOptions.enableDepth( false );
@@ -931,8 +935,8 @@ void Device::start( const DeviceOptions& deviceOptions )
 		if ( mDeviceOptions.isInfraredEnabled() && mDeviceOptions.getInfraredResolution() != ImageResolution::NUI_IMAGE_RESOLUTION_INVALID ) {
 			KINECT_IMAGE_FRAME_FORMAT format	= { sizeof( KINECT_IMAGE_FRAME_FORMAT ), 0 };
 			mFormatInfrared						= format;
-			KinectEnableIRStream( mKinect, mDeviceOptions.getInfraredResolution(), &mFormatInfrared );
-            if ( KinectGetIRStreamStatus( mKinect ) != KINECT_STREAM_STATUS::KinectStreamStatusError ) {
+			KinectEnableIRStream( mDeviceOptions.getDeviceHandle(), mDeviceOptions.getInfraredResolution(), &mFormatInfrared );
+            if ( KinectGetIRStreamStatus( mDeviceOptions.getDeviceHandle() ) != KINECT_STREAM_STATUS::KinectStreamStatusError ) {
 				mBufferInfrared					= new uint8_t[ mFormatInfrared.cbBufferSize ];
 			} else {
 				mDeviceOptions.enableInfrared( false );
@@ -943,9 +947,9 @@ void Device::start( const DeviceOptions& deviceOptions )
 		}
 
 		if ( mDeviceOptions.isUserTrackingEnabled() ) {
-			KinectEnableSkeletonStream( mKinect, mDeviceOptions.isSeatedModeEnabled(), 
+			KinectEnableSkeletonStream( mDeviceOptions.getDeviceHandle(), mDeviceOptions.isSeatedModeEnabled(), 
 				mDeviceOptions.getSkeletonSelectionMode(), &kTransformParams[ mDeviceOptions.getSkeletonTransform() ] );
-			if ( KinectGetSkeletonStreamStatus( mKinect ) != KINECT_STREAM_STATUS::KinectStreamStatusError ) {
+			if ( KinectGetSkeletonStreamStatus( mDeviceOptions.getDeviceHandle() ) != KINECT_STREAM_STATUS::KinectStreamStatusError ) {
 				mIsSkeletonDevice = true;
 			} else {
 				mDeviceOptions.enableUserTracking( false );
@@ -960,7 +964,7 @@ void Device::start( const DeviceOptions& deviceOptions )
 			mSkeletons.push_back( Skeleton() );
 		}
 
-		hr = KinectStartStreams( mKinect );
+		hr = KinectStartStreams( mDeviceOptions.getDeviceHandle() );
 		if ( FAILED( hr ) ) {
 			console() << "Unable to start the streams: ";
 			errorNui( hr );
@@ -1026,13 +1030,13 @@ void Device::stop()
 	if ( mBufferInfrared != nullptr ) {
 		delete [] mBufferInfrared;
 	}
-	KinectCloseSensor( mKinect );
+	KinectCloseSensor( mDeviceOptions.getDeviceHandle() );
 	init( true );
 }
 
 void Device::update()
 {
-	if ( !KinectAllFramesReady( mKinect ) ) {
+	if ( !KinectAllFramesReady( mDeviceOptions.getDeviceHandle() ) ) {
 		return;
 	}
 
@@ -1048,20 +1052,20 @@ void Device::update()
 
 	long long timestamp;
 	if ( mDeviceOptions.isColorEnabled() && 
-		SUCCEEDED( KinectGetColorFrame( mKinect, mFormatColor.cbBufferSize, mBufferColor, &timestamp ) ) ) {
+		SUCCEEDED( KinectGetColorFrame( mDeviceOptions.getDeviceHandle(), mFormatColor.cbBufferSize, mBufferColor, &timestamp ) ) ) {
 		mSurfaceColor = Surface8u( mBufferColor, 
 			(int32_t)mFormatColor.dwWidth, (int32_t)mFormatColor.dwHeight, 
 			(int32_t)mFormatColor.dwWidth *(int32_t) mFormatColor.cbBytesPerPixel, 
 			SurfaceChannelOrder::BGRX );
 	}
 	if ( mDeviceOptions.isDepthEnabled() && 
-		SUCCEEDED( KinectGetDepthFrame( mKinect, mFormatDepth.cbBufferSize, mBufferDepth, &timestamp ) ) ) {
+		SUCCEEDED( KinectGetDepthFrame( mDeviceOptions.getDeviceHandle(), mFormatDepth.cbBufferSize, mBufferDepth, &timestamp ) ) ) {
 		mChannelDepth = Channel16u( (int32_t)mFormatDepth.dwWidth, (int32_t)mFormatDepth.dwHeight, 
 			(int32_t)mFormatDepth.dwWidth * (int32_t)mFormatDepth.cbBytesPerPixel, 0, 
 			(uint16_t*)mBufferDepth );
     }
 	if ( mDeviceOptions.isInfraredEnabled() && 
-		SUCCEEDED( KinectGetColorFrame( mKinect, mFormatInfrared.cbBufferSize, mBufferInfrared, &timestamp ) ) ) {
+		SUCCEEDED( KinectGetColorFrame( mDeviceOptions.getDeviceHandle(), mFormatInfrared.cbBufferSize, mBufferInfrared, &timestamp ) ) ) {
 		mChannelInfrared = Channel16u( (int32_t)mFormatInfrared.dwWidth, (int32_t)mFormatInfrared.dwHeight, 
 			(int32_t)mFormatInfrared.dwWidth * (int32_t)mFormatInfrared.cbBytesPerPixel, 0, 
 			(uint16_t*)mBufferInfrared );
@@ -1069,7 +1073,7 @@ void Device::update()
 
 	NUI_SKELETON_FRAME skeletonFrame;
 	if ( mDeviceOptions.isUserTrackingEnabled() && 
-		SUCCEEDED( KinectGetSkeletonFrame( mKinect, &skeletonFrame ) ) ) {
+		SUCCEEDED( KinectGetSkeletonFrame( mDeviceOptions.getDeviceHandle(), &skeletonFrame ) ) ) {
 		for ( int32_t i = 0; i < NUI_SKELETON_COUNT; ++i ) {
 			mSkeletons.at( i ).clear();
 			NUI_SKELETON_TRACKING_STATE trackingState = skeletonFrame.SkeletonData[ i ].eTrackingState;
