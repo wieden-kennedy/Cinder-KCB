@@ -1065,7 +1065,7 @@ void Device::update()
 			(uint16_t*)mBufferDepth );
     }
 	if ( mDeviceOptions.isInfraredEnabled() && 
-		SUCCEEDED( KinectGetColorFrame( mDeviceOptions.getDeviceHandle(), mFormatInfrared.cbBufferSize, mBufferInfrared, &timestamp ) ) ) {
+		SUCCEEDED( KinectGetIRFrame( mDeviceOptions.getDeviceHandle(), mFormatInfrared.cbBufferSize, mBufferInfrared, &timestamp ) ) ) {
 		mChannelInfrared = Channel16u( (int32_t)mFormatInfrared.dwWidth, (int32_t)mFormatInfrared.dwHeight, 
 			(int32_t)mFormatInfrared.dwWidth * (int32_t)mFormatInfrared.cbBytesPerPixel, 0, 
 			(uint16_t*)mBufferInfrared );
