@@ -261,7 +261,25 @@ void ParticleApp::setup()
 	deviceOptions.setDepthResolution( MsKinect::ImageResolution::NUI_IMAGE_RESOLUTION_640x480 );
 	mDevice = MsKinect::Device::create();
 	mDevice->connectEventHandler( &ParticleApp::onFrame, this );
-	mDevice->start( deviceOptions );
+	try {
+		mDevice->start( deviceOptions );
+	} catch ( MsKinect::Device::ExcDeviceCreate ex ) {
+		console() << ex.what() << endl;
+	} catch ( MsKinect::Device::ExcDeviceInit ex ) {
+		console() << ex.what() << endl;
+	} catch ( MsKinect::Device::ExcDeviceInvalid ex ) {
+		console() << ex.what() << endl;
+	} catch ( MsKinect::Device::ExcGetCoordinateMapper ex ) {
+		console() << ex.what() << endl;
+	} catch ( MsKinect::Device::ExcOpenStreamColor ex ) {
+		console() << ex.what() << endl;
+	} catch ( MsKinect::Device::ExcOpenStreamDepth ex ) {
+		console() << ex.what() << endl;
+	} catch ( MsKinect::Device::ExcStreamStart ex ) {
+		console() << ex.what() << endl;
+	} catch ( MsKinect::Device::ExcUserTrackingEnable ex ) {
+		console() << ex.what() << endl;
+	}
 
 	////////////////////////////////////////////////////////////////
 	// Set up particles

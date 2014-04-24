@@ -59,11 +59,12 @@ namespace MsKinect
 {
 class Device;
 class DeviceOptions;
-typedef NUI_SKELETON_BONE_ROTATION		BoneRotation;
-typedef NUI_IMAGE_RESOLUTION			ImageResolution;
-typedef NUI_SKELETON_POSITION_INDEX		JointName;
-typedef KINECT_SKELETON_SELECTION_MODE	SkeletonSelectionMode;
-typedef std::shared_ptr<Device>			DeviceRef;
+typedef NUI_SKELETON_BONE_ROTATION				BoneRotation;
+typedef NUI_IMAGE_RESOLUTION					ImageResolution;
+typedef NUI_SKELETON_POSITION_INDEX				JointName;
+typedef NUI_SKELETON_POSITION_TRACKING_STATE	JointTrackingState;
+typedef KINECT_SKELETON_SELECTION_MODE			SkeletonSelectionMode;
+typedef std::shared_ptr<Device>					DeviceRef;
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -98,39 +99,6 @@ protected:
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 
-//! Counts the number of users in \a depth.
-size_t									calcNumUsersFromDepth( const ci::Channel16u& depth );
-//! Creates a surface with colorized users from \a depth.
-ci::Surface16u							depthChannelToSurface( const ci::Channel16u& depth, 
-															  const DepthProcessOptions& depthProcessOptions = DepthProcessOptions() );
-//! Returns depth value as 0.0 - 1.0 float for pixel at \a pos.
-float									getDepthAtCoord( const ci::Channel16u& depth, const ci::Vec2i& v );
-//! Returns number of Kinect devices.
-size_t									getDeviceCount();
-//! Returns use color for user ID \a id.
-ci::Colorf								getUserColor( uint32_t id );
-//! Returns pixel location of color position in depth image.
-ci::Vec2i								mapColorCoordToDepth( const ci::Vec2i& v, const ci::Channel16u& depth, 
-															 ImageResolution colorResolution, ImageResolution depthResolution );
-//! Returns pixel location of skeleton position in color image. Requires depth resolution.s
-ci::Vec2i								mapSkeletonCoordToColor( const ci::Vec3f& v, const ci::Channel16u& depth, 
-																ImageResolution colorResolution, ImageResolution depthResolution );
-//! Returns pixel location of skeleton position in depth image.
-ci::Vec2i								mapSkeletonCoordToDepth( const ci::Vec3f& v, ImageResolution depthResolution );
-//! Returns user ID for pixel at \a coord in \a depth. 0 is no user.
-uint16_t								userIdFromDepthCoord( const ci::Channel16u& depth, const ci::Vec2i& v );
-
-//////////////////////////////////////////////////////////////////////////////////////////////
-
-/*! Skeleton smoothing enumeration. Smoother transform improves skeleton accuracy, 
-	but increases latency. */
-enum : uint_fast8_t
-{
-	TRANSFORM_NONE, TRANSFORM_DEFAULT, TRANSFORM_SMOOTH, TRANSFORM_VERY_SMOOTH, TRANSFORM_MAX
-} typedef								SkeletonTransform;
-
-//////////////////////////////////////////////////////////////////////////////////////////////
-
 class Bone
 {
 public:
@@ -148,8 +116,10 @@ public:
 	const ci::Matrix44f&				getRotationMatrix() const;
 	//! Returns index of start joint.
 	JointName							getStartJoint() const;
+	//! Returns joint tracking state.
+	JointTrackingState					getTrackingState() const;
 private:
-	Bone( const Vector4& position, const _NUI_SKELETON_BONE_ORIENTATION& bone );
+	Bone( const Vector4& position, const _NUI_SKELETON_BONE_ORIENTATION& bone, JointTrackingState trackingState );
 	ci::Matrix44f						mAbsRotMat;
 	ci::Quatf							mAbsRotQuat;
 	JointName							mJointEnd;
@@ -157,10 +127,49 @@ private:
 	ci::Vec3f							mPosition;
 	ci::Matrix44f						mRotMat;
 	ci::Quatf							mRotQuat;
+	JointTrackingState					mTrackingState;
 
 	friend class						Device;
 };
 typedef std::map<JointName, Bone>		Skeleton;
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+
+//! Counts the number of users in \a depth.
+size_t									calcNumUsersFromDepth( const ci::Channel16u& depth );
+/*! Calculates confidence of \a skeleton between 0.0 and 1.0. Joints 
+	are weighted by distance to torso when \a weighted is true. */
+float									calcSkeletonConfidence( const Skeleton& skeleton, bool weighted = false );
+//! Creates a surface with colorized users from \a depth.
+ci::Surface16u							depthChannelToSurface( const ci::Channel16u& depth, 
+															  const DepthProcessOptions& depthProcessOptions = DepthProcessOptions() );
+//! Returns depth value as 0.0 - 1.0 float for pixel at \a pos.
+float									getDepthAtCoord( const ci::Channel16u& depth, const ci::Vec2i& v );
+//! Returns number of Kinect devices.
+size_t									getDeviceCount();
+//! Returns use color for user ID \a id.
+ci::Colorf								getUserColor( uint32_t id );
+//! Returns pixel location of color position in depth image.
+ci::Vec2i								mapColorCoordToDepth( const ci::Vec2i& v, const ci::Channel16u& depth, 
+															  const DeviceRef& device );
+//! Returns pixel location of color position in depth image.
+ci::Vec2i								mapDepthCoordToColor( const ci::Vec2i& v, const ci::Channel16u& depth, 
+															  const DeviceRef& device );
+//! Returns pixel location of skeleton position in color image. Requires depth resolution.
+ci::Vec2i								mapSkeletonCoordToColor( const ci::Vec3f& v, const DeviceRef& device );
+//! Returns pixel location of skeleton position in depth image.
+ci::Vec2i								mapSkeletonCoordToDepth( const ci::Vec3f& v, const DeviceRef& device );
+//! Returns user ID for pixel at \a coord in \a depth. 0 is no user.
+uint16_t								userIdFromDepthCoord( const ci::Channel16u& depth, const ci::Vec2i& v );
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+
+/*! Skeleton smoothing enumeration. Smoother transform improves skeleton accuracy, 
+	but increases latency. */
+enum : uint_fast8_t
+{
+	TRANSFORM_NONE, TRANSFORM_DEFAULT, TRANSFORM_SMOOTH, TRANSFORM_VERY_SMOOTH, TRANSFORM_MAX
+} typedef								SkeletonTransform;
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -178,6 +187,8 @@ public:
 	ImageResolution						getDepthResolution() const; 
 	//! Returns size of depth image.
 	const ci::Vec2i&					getDepthSize() const;
+	//! Returns KCB handle for this device.
+	KCBHANDLE							getDeviceHandle() const;
 	//! Returns unique ID for this device.
 	const std::string&					getDeviceId() const;
 	//! Returns 0-index for this device.
@@ -251,7 +262,11 @@ protected:
 
 	std::string							mDeviceId;
 	int32_t								mDeviceIndex;
+	KCBHANDLE							mDeviceHandle;
+
+	friend class						Device;
 };
+
 //////////////////////////////////////////////////////////////////////////////////////////////
 
 /*! Class representing Kinect frame data. A frame only contains data 
@@ -313,6 +328,8 @@ public:
 	//! Enables verbose error reporting in debug console. Default is true.
 	void								enableVerbose( bool enable = true );
 
+	//! Returns coordinate mapper for this device.
+	INuiCoordinateMapper*				getCoordinateMapper() const;
 	//! Returns options object for this device.
 	const DeviceOptions&				getDeviceOptions() const;
 	//! Returns accelerometer reading.
@@ -349,8 +366,8 @@ protected:
 	std::function<void ( Frame frame )>	mEventHandler;
 	
 	DeviceOptions						mDeviceOptions;
-
-	KCBHANDLE							mKinect;
+	
+	INuiCoordinateMapper*				mCoordinateMapper;
 	INuiSensor*							mNuiSensor;
 
 	uint8_t*							mBufferColor;
@@ -375,7 +392,11 @@ protected:
 	void								statusKinect( KINECT_SENSOR_STATUS status );
 	std::string							wcharToString( wchar_t* v );
 	
-	friend void __stdcall				deviceStatus( long hr, const WCHAR* instanceName, const WCHAR* deviceId, void* data );
+	friend void __stdcall				deviceStatus( long hr, const wchar_t* instanceName, const wchar_t* deviceId, void* data );
+	friend ci::Vec2i					mapDepthCoordToColor( const ci::Vec2i& v, const ci::Channel16u& depth, 
+															  const DeviceRef& device );
+	friend ci::Vec2i					mapSkeletonCoordToColor( const ci::Vec3f& v, const DeviceRef& device );
+	friend ci::Vec2i					mapSkeletonCoordToDepth( const ci::Vec3f& v, const DeviceRef& device );
 
 	//////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -410,25 +431,53 @@ public:
 		ExcDeviceInvalid( long hr, const std::string& id ) throw();
 	};
 
+	//! Exception representing a lack of attached devices.
+	class ExcDeviceUnavailable : public Exception 
+	{
+	public:
+		ExcDeviceUnavailable() throw();
+	};
+
+	//! Exception representing attempt to get coordinate mapper.
+	class ExcGetCoordinateMapper : public Exception 
+	{
+	public:
+		ExcGetCoordinateMapper( long hr, const std::string& id ) throw();
+	};
+
 	//! Exception representing failure to open color stream.
 	class ExcOpenStreamColor : public Exception
 	{
 	public:
-		ExcOpenStreamColor( long hr ) throw();
+		ExcOpenStreamColor( long hr, const std::string& id ) throw();
 	};
 
 	//! Exception representing failure to open depth stream.
 	class ExcOpenStreamDepth : public Exception
 	{
 	public:
-		ExcOpenStreamDepth( long hr ) throw();
+		ExcOpenStreamDepth( long hr, const std::string& id ) throw();
 	};
 
-	//! Exception representing failure to enable skeleton tracking.
-	class ExcSkeletonTrackingEnable : public Exception
+	//! Exception representing failure to open infrared stream.
+	class ExcOpenStreamInfrared : public Exception
 	{
 	public:
-		ExcSkeletonTrackingEnable( long hr ) throw();
+		ExcOpenStreamInfrared( long hr, const std::string& id ) throw();
+	};
+
+	//! Exception representing failure to start open streams.
+	class ExcStreamStart : public Exception
+	{
+	public:
+		ExcStreamStart( long hr, const std::string& id ) throw();
+	};
+
+	//! Exception representing failure to enable user tracking.
+	class ExcUserTrackingEnable : public Exception
+	{
+	public:
+		ExcUserTrackingEnable( long hr, const std::string& id ) throw();
 	};
 };
 }

@@ -49,6 +49,26 @@ using namespace std;
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 
+Matrix44f toMatrix44f( const Matrix4& m ) 
+{
+	return Matrix44f( Vec4f( m.M11, m.M12, m.M13, m.M14 ), 
+		Vec4f( m.M21, m.M22, m.M23, m.M24 ), 
+		Vec4f( m.M31, m.M32, m.M33, m.M34 ), 
+		Vec4f( m.M41, m.M42, m.M43, m.M44 ) );
+}
+
+Quatf toQuatf( const Vector4& v ) 
+{
+	return Quatf( v.w, v.x, v.y, v.z );
+}
+
+Vec3f toVec3f( const Vector4& v ) 
+{
+	return Vec3f( v.x, v.y, v.z );
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+
 DepthProcessOptions::DepthProcessOptions()
 	: mBinary( false ), mBinaryInverted( false ), mRemoveBackground( false ), mUserColor( false )
 {
@@ -96,6 +116,60 @@ bool DepthProcessOptions::isUserColorEnabled() const
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 
+Bone::Bone( const Vector4& position, const _NUI_SKELETON_BONE_ORIENTATION& bone, JointTrackingState trackingState )
+{
+	mAbsRotQuat		= toQuatf( bone.absoluteRotation.rotationQuaternion );
+	mAbsRotMat		= toMatrix44f( bone.absoluteRotation.rotationMatrix );
+	mJointEnd		= bone.endJoint;
+	mJointStart		= bone.startJoint;
+	mPosition		= toVec3f( position );
+	mRotQuat		= toQuatf( bone.hierarchicalRotation.rotationQuaternion );
+	mRotMat			= toMatrix44f( bone.hierarchicalRotation.rotationMatrix );
+	mTrackingState	= trackingState;
+}
+
+const Quatf& Bone::getAbsoluteRotation() const 
+{ 
+	return mAbsRotQuat; 
+}
+
+const Matrix44f& Bone::getAbsoluteRotationMatrix() const 
+{ 
+	return mAbsRotMat; 
+}
+
+JointName Bone::getEndJoint() const
+{
+	return mJointEnd;
+}
+
+const Vec3f& Bone::getPosition() const 
+{ 
+	return mPosition; 
+}
+
+const Quatf& Bone::getRotation() const 
+{ 
+	return mRotQuat; 
+}
+
+const Matrix44f& Bone::getRotationMatrix() const 
+{ 
+	return mRotMat; 
+}
+
+JointName Bone::getStartJoint() const
+{
+	return mJointStart;
+}
+
+JointTrackingState Bone::getTrackingState() const
+{
+	return mTrackingState;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+
 size_t calcNumUsersFromDepth( const Channel16u& depth )
 {
 	if ( !depth ) {
@@ -113,6 +187,50 @@ size_t calcNumUsersFromDepth( const Channel16u& depth )
 		}
 	}
 	return users.size();
+}
+
+float calcSkeletonConfidence( const Skeleton& skeleton, bool weighted )
+{
+	// TODO weighted
+	float c = 0.0f;
+	if ( weighted ) {
+		static map<JointName, float> weights;
+		if ( weights.empty() ) {
+			weights[ JointName::NUI_SKELETON_POSITION_HIP_CENTER ]		= 0.090909091f;
+			weights[ JointName::NUI_SKELETON_POSITION_SPINE ]			= 0.090909091f;
+			weights[ JointName::NUI_SKELETON_POSITION_SHOULDER_CENTER ]	= 0.090909091f;
+			weights[ JointName::NUI_SKELETON_POSITION_HEAD ]			= 0.045454545f;
+			weights[ JointName::NUI_SKELETON_POSITION_SHOULDER_LEFT ]	= 0.090909091f;
+			weights[ JointName::NUI_SKELETON_POSITION_ELBOW_LEFT ]		= 0.045454545f;
+			weights[ JointName::NUI_SKELETON_POSITION_WRIST_LEFT ]		= 0.022727273f;
+			weights[ JointName::NUI_SKELETON_POSITION_HAND_LEFT ]		= 0.011363636f;
+			weights[ JointName::NUI_SKELETON_POSITION_SHOULDER_RIGHT ]	= 0.090909091f;
+			weights[ JointName::NUI_SKELETON_POSITION_ELBOW_RIGHT ]		= 0.045454545f;
+			weights[ JointName::NUI_SKELETON_POSITION_WRIST_RIGHT ]		= 0.022727273f;
+			weights[ JointName::NUI_SKELETON_POSITION_HAND_RIGHT ]		= 0.011363636f;
+			weights[ JointName::NUI_SKELETON_POSITION_HIP_LEFT ]		= 0.090909091f;
+			weights[ JointName::NUI_SKELETON_POSITION_KNEE_LEFT ]		= 0.045454545f;
+			weights[ JointName::NUI_SKELETON_POSITION_ANKLE_LEFT ]		= 0.022727273f;
+			weights[ JointName::NUI_SKELETON_POSITION_FOOT_LEFT ]		= 0.011363636f;
+			weights[ JointName::NUI_SKELETON_POSITION_HIP_RIGHT ]		= 0.090909091f;
+			weights[ JointName::NUI_SKELETON_POSITION_KNEE_RIGHT ]		= 0.045454545f;
+			weights[ JointName::NUI_SKELETON_POSITION_ANKLE_RIGHT ]		= 0.022727273f;
+			weights[ JointName::NUI_SKELETON_POSITION_FOOT_RIGHT ]		= 0.011363636f;
+		}
+		for ( Skeleton::const_iterator iter = skeleton.begin(); iter != skeleton.end(); ++iter ) {
+			if ( iter->second.getTrackingState() == JointTrackingState::NUI_SKELETON_POSITION_TRACKED ) {
+				c += weights.at( iter->first );
+			}
+		}
+	} else {
+		for ( Skeleton::const_iterator iter = skeleton.begin(); iter != skeleton.end(); ++iter ) {
+			if ( iter->second.getTrackingState() == JointTrackingState::NUI_SKELETON_POSITION_TRACKED ) {
+				c += 1.0f;
+			}
+		}
+		c /= (float)JointName::NUI_SKELETON_POSITION_COUNT;
+	}
+	return c;
 }
 
 Surface16u depthChannelToSurface( const Channel16u& depth, const DepthProcessOptions& depthProcessOptions )
@@ -156,11 +274,24 @@ Surface16u depthChannelToSurface( const Channel16u& depth, const DepthProcessOpt
 	return surface;
 }
 
-float getDepthAtCoord( const ci::Channel16u& depth, const ci::Vec2i& v ) 
+void CALLBACK deviceStatus( long hr, const wchar_t *instanceName, const wchar_t *deviceId, void *data )
 {
-	float depthNorm		= 0.0f;
+	Device* device = reinterpret_cast<Device*>( data );
+	if ( SUCCEEDED( hr ) ) {
+		device->start( device->getDeviceOptions() );
+	} else {
+		device->errorNui( hr );
+		device->stop();
+	}
+}
+
+float getDepthAtCoord( const Channel16u& depth, const Vec2i& v ) 
+{
+	float depthNorm	= 0.0f;
 	if ( depth ) {
-		uint16_t d	= 0x10000 - depth.getValue( v );
+		uint16_t d	= depth.getValue( v );
+		d			= 0x10000 * ( ( d & 0xFFF8 ) >> 3 ) / 0x0FFF;
+		d			= 0x10000 - d;
 		d			= d << 2;
 		depthNorm	= 1.0f - (float)d / 65535.0f;
 	}
@@ -194,38 +325,77 @@ Colorf getUserColor( uint32_t id )
 	}
 }
 
-Vec2i mapColorCoordToDepth( const Vec2i& v, const Channel16u& depth, 
-						   ImageResolution colorResolution, ImageResolution depthResolution )
+Vec2i mapColorCoordToDepth( const Vec2i& v, const Channel16u& depth, const DeviceRef& device )
 {
 	long x;
 	long y;
-	NuiImageGetColorPixelCoordinatesFromDepthPixelAtResolution( 
-		colorResolution, 
-		depthResolution, 
-		0, v.x, v.y, 
-		depth.getValue( v ), &x, &y ); 
+	if ( depth && device ) {
+		NuiImageGetColorPixelCoordinatesFromDepthPixelAtResolution( 
+			device->getDeviceOptions().getColorResolution(), 
+			device->getDeviceOptions().getDepthResolution(), 
+			0, v.x, v.y, 
+			depth.getValue( v ), &x, &y );
+	}
 	return Vec2i( (int32_t)x, (int32_t)y );
 }
 
-Vec2i mapSkeletonCoordToColor( const Vec3f& v, const Channel16u& depth, 
-							  ImageResolution colorResolution, ImageResolution depthResolution )
+Vec2i mapDepthCoordToColor( const Vec2i& v, const Channel16u& depth, const DeviceRef& device )
 {
-	Vec2i v2	= mapSkeletonCoordToDepth( v, depthResolution );
-	v2			= mapColorCoordToDepth( v2, depth, colorResolution, depthResolution );
-	return v2;
+	NUI_COLOR_IMAGE_POINT mapped;
+	if ( depth && device && device->getCoordinateMapper() ) {
+		NUI_DEPTH_IMAGE_POINT p;
+		p.x		= v.x;
+		p.y		= v.y;
+		p.depth	= depth.getValue( v );
+		long hr = device->getCoordinateMapper()->MapDepthPointToColorPoint( 
+			device->getDeviceOptions().getDepthResolution(), &p, 
+			NUI_IMAGE_TYPE::NUI_IMAGE_TYPE_COLOR_INFRARED, 
+			device->getDeviceOptions().getColorResolution(), &mapped 
+			);
+		if ( FAILED( hr ) ) {
+			device->errorNui( hr );
+		}
+	}
+	return Vec2i( mapped.x, mapped.y );
 }
 
-Vec2i mapSkeletonCoordToDepth( const Vec3f& v, ImageResolution depthResolution )
+Vec2i mapSkeletonCoordToColor( const Vec3f& v, const DeviceRef& device )
 {
-	float x;
-	float y;
-	Vector4 pos;
-	pos.x = v.x;
-	pos.y = v.y;
-	pos.z = v.z;
-	pos.w = 1.0f;
-	NuiTransformSkeletonToDepthImage( pos, &x, &y, depthResolution );
-	return Vec2i( (int32_t)x, (int32_t)y );
+	NUI_COLOR_IMAGE_POINT mapped;
+	if ( device && device->getCoordinateMapper() ) {
+		Vector4 p;
+		p.x		= v.x;
+		p.y		= v.y;
+		p.z		= v.z;
+		p.w		= 0.0f;
+		long hr	= device->getCoordinateMapper()->MapSkeletonPointToColorPoint( 
+			&p, NUI_IMAGE_TYPE::NUI_IMAGE_TYPE_COLOR, 
+			device->getDeviceOptions().getColorResolution(), &mapped 
+			);
+		if ( FAILED( hr ) ) {
+			device->errorNui( hr );
+		}
+	}
+	return Vec2i( mapped.x, mapped.y );
+}
+
+Vec2i mapSkeletonCoordToDepth( const Vec3f& v, const DeviceRef& device )
+{
+	NUI_DEPTH_IMAGE_POINT mapped;
+	if ( device && device->getCoordinateMapper() ) {
+		Vector4 p;
+		p.x		= v.x;
+		p.y		= v.y;
+		p.z		= v.z;
+		p.w		= 0.0f;
+		long hr	= device->getCoordinateMapper()->MapSkeletonPointToDepthPoint( 
+			&p, device->getDeviceOptions().getDepthResolution(), &mapped 
+			);
+		if ( FAILED( hr ) ) {
+			device->errorNui( hr );
+		}
+	}
+	return Vec2i( mapped.x, mapped.y );
 }
 
 uint16_t userIdFromDepthCoord( const Channel16u& depth, const Vec2i& v )
@@ -233,97 +403,22 @@ uint16_t userIdFromDepthCoord( const Channel16u& depth, const Vec2i& v )
 	return NuiDepthPixelToPlayerIndex( depth.getValue( v ) );
 }
 
-Matrix44f toMatrix44f( const Matrix4& m ) 
-{
-	return Matrix44f( Vec4f( m.M11, m.M12, m.M13, m.M14 ), 
-		Vec4f( m.M21, m.M22, m.M23, m.M24 ), 
-		Vec4f( m.M31, m.M32, m.M33, m.M34 ), 
-		Vec4f( m.M41, m.M42, m.M43, m.M44 ) );
-}
-Quatf toQuatf( const Vector4& v ) 
-{
-	return Quatf( v.w, v.x, v.y, v.z );
-}
-Vec3f toVec3f( const Vector4& v ) 
-{
-	return Vec3f( v.x, v.y, v.z );
-}
-
-void CALLBACK deviceStatus( long hr, const WCHAR *instanceName, const WCHAR *deviceId, void *data )
-{
-	Device* device = reinterpret_cast<Device*>( data );
-	if ( SUCCEEDED( hr ) ) {
-		device->start( device->getDeviceOptions() );
-	} else {
-		device->errorNui( hr );
-		reinterpret_cast<Device*>( data )->stop();
-	}
-}
-
-const NUI_TRANSFORM_SMOOTH_PARAMETERS	kTransformNone			= { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
-const NUI_TRANSFORM_SMOOTH_PARAMETERS	kTransformDefault		= { 0.5f, 0.5f, 0.5f, 0.05f, 0.04f };
-const NUI_TRANSFORM_SMOOTH_PARAMETERS	kTransformSmooth		= { 0.5f, 0.1f, 0.5f, 0.1f, 0.1f };
-const NUI_TRANSFORM_SMOOTH_PARAMETERS	kTransformVerySmooth	= { 0.7f, 0.3f, 1.0f, 1.0f, 1.0f };
-const NUI_TRANSFORM_SMOOTH_PARAMETERS	kTransformMax			= { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
-const NUI_TRANSFORM_SMOOTH_PARAMETERS	kTransformParams[ 5 ]	= 
+NUI_TRANSFORM_SMOOTH_PARAMETERS	kTransformNone			= { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
+NUI_TRANSFORM_SMOOTH_PARAMETERS	kTransformDefault		= { 0.5f, 0.5f, 0.5f, 0.05f, 0.04f };
+NUI_TRANSFORM_SMOOTH_PARAMETERS	kTransformSmooth		= { 0.5f, 0.1f, 0.5f, 0.1f, 0.1f };
+NUI_TRANSFORM_SMOOTH_PARAMETERS	kTransformVerySmooth	= { 0.7f, 0.3f, 1.0f, 1.0f, 1.0f };
+NUI_TRANSFORM_SMOOTH_PARAMETERS	kTransformMax			= { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
+NUI_TRANSFORM_SMOOTH_PARAMETERS	kTransformParams[ 5 ]	= 
 { kTransformNone, kTransformDefault, kTransformSmooth, kTransformVerySmooth, kTransformMax };
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 
-Bone::Bone( const Vector4& position, const _NUI_SKELETON_BONE_ORIENTATION& bone )
-{
-	mAbsRotQuat	= toQuatf( bone.absoluteRotation.rotationQuaternion );
-	mAbsRotMat	= toMatrix44f( bone.absoluteRotation.rotationMatrix );
-	mJointEnd	= bone.endJoint;
-	mJointStart	= bone.startJoint;
-	mPosition	= toVec3f( position );
-	mRotQuat	= toQuatf( bone.hierarchicalRotation.rotationQuaternion );
-	mRotMat		= toMatrix44f( bone.hierarchicalRotation.rotationMatrix );
-}
-
-const Quatf& Bone::getAbsoluteRotation() const 
-{ 
-	return mAbsRotQuat; 
-}
-const Matrix44f& Bone::getAbsoluteRotationMatrix() const 
-{ 
-	return mAbsRotMat; 
-}
-JointName Bone::getEndJoint() const
-{
-	return mJointEnd;
-}
-const Vec3f& Bone::getPosition() const 
-{ 
-	return mPosition; 
-}
-const Quatf& Bone::getRotation() const 
-{ 
-	return mRotQuat; 
-}
-const Matrix44f& Bone::getRotationMatrix() const 
-{ 
-	return mRotMat; 
-}
-JointName Bone::getStartJoint() const
-{
-	return mJointStart;
-}
-
-//////////////////////////////////////////////////////////////////////////////////////////////
-
 DeviceOptions::DeviceOptions()
+: mDeviceHandle( KCB_INVALID_HANDLE ), mDeviceId( "" ), mDeviceIndex( 0 ), mEnabledColor( true ), 
+mEnabledDepth( true ), mEnabledInfrared( false ), mEnabledNearMode( false ), mEnabledSeatedMode( false ),
+mEnabledUserTracking( true ), mSkeletonTransform( SkeletonTransform::TRANSFORM_DEFAULT ),
+mSkeletonSelectionMode( SkeletonSelectionMode::SkeletonSelectionModeDefault )
 {
-	mDeviceId				= "";
-	mDeviceIndex			= 0;
-	mEnabledColor			= true;
-	mEnabledDepth			= true;
-	mEnabledInfrared		= false;
-	mEnabledNearMode		= false;
-	mEnabledSeatedMode		= false;
-	mEnabledUserTracking	= true;
-	mSkeletonTransform		= SkeletonTransform::TRANSFORM_DEFAULT;
-	mSkeletonSelectionMode	= SkeletonSelectionMode::SkeletonSelectionModeDefault;
 	setColorResolution( ImageResolution::NUI_IMAGE_RESOLUTION_640x480 );
 	setDepthResolution( ImageResolution::NUI_IMAGE_RESOLUTION_320x240 );
 	setInfraredResolution( ImageResolution::NUI_IMAGE_RESOLUTION_320x240 );
@@ -383,6 +478,11 @@ ImageResolution DeviceOptions::getDepthResolution() const
 const Vec2i& DeviceOptions::getDepthSize() const
 {
 	return mDepthSize;
+}
+
+KCBHANDLE DeviceOptions::getDeviceHandle() const
+{
+	return mDeviceHandle;
 }
 
 const string& DeviceOptions::getDeviceId() const
@@ -540,9 +640,9 @@ Frame::Frame()
 }
 
 Frame::Frame( long long frameId, const std::string& deviceId, const Surface8u& color, 
-			 const Channel16u& depth, const Channel16u& infrared, const std::vector<Skeleton>& skeletons )
-	: mColorSurface( color ), mDepthChannel( depth ), mDeviceId( deviceId ), mFrameId( frameId ), 
-	mInfraredChannel( infrared ), mSkeletons( skeletons )
+			 const Channel16u& depth, const Channel16u& infrared, const std::vector<Skeleton>& skeletons ) 
+: mColorSurface( color ), mDepthChannel( depth ), mDeviceId( deviceId ), 
+mFrameId( frameId ), mInfraredChannel( infrared ), mSkeletons( skeletons )
 {
 }
 
@@ -663,6 +763,11 @@ void Device::errorNui( long hr ) {
 	console() << endl;
 }
 
+INuiCoordinateMapper* Device::getCoordinateMapper() const
+{
+	return mCoordinateMapper;
+}
+
 const DeviceOptions& Device::getDeviceOptions() const
 {
 	return mDeviceOptions;
@@ -701,8 +806,8 @@ void Device::init( bool reset )
 	mBufferDepth		= nullptr;
 	mBufferInfrared		= nullptr;
 	mCapture			= false;
+	mCoordinateMapper	= 0;
 	mFrameId			= 0;
-    mKinect				= KCB_INVALID_HANDLE;
 	mNuiSensor			= 0;
 	mIsSkeletonDevice	= false;
 	mTiltRequestTime	= 0.0;
@@ -751,12 +856,17 @@ void Device::start( const DeviceOptions& deviceOptions )
 			index = math<int32_t>::clamp( index, 0, math<int32_t>::max( getDeviceCount() - 1, 0 ) );
 		}
 
+		if ( getDeviceCount() == 0 ) {
+			console( ) << "No devices available" << endl;
+			throw ExcDeviceUnavailable();
+		}
+
 		wchar_t portId[ KINECT_MAX_PORTID_LENGTH ];
 		size_t count = KinectGetPortIDCount();
 		if ( index >= 0 ) {
 			if ( KinectGetPortIDByIndex( index, _countof( portId ), portId ) ) {
-				mKinect = KinectOpenSensor( portId );
-				hr		= NuiCreateSensorById( portId, &mNuiSensor );
+				mDeviceOptions.mDeviceHandle	= KinectOpenSensor( portId );
+				hr								= NuiCreateSensorById( portId, &mNuiSensor );
 				mDeviceOptions.setDeviceId( wcharToString( portId ) );
 			}
 		} else if ( deviceId.length() > 0 ) {
@@ -764,7 +874,7 @@ void Device::start( const DeviceOptions& deviceOptions )
 			hr = NuiCreateSensorById( id, &mNuiSensor );
 			for ( size_t i = 0; i < count; ++i ) {
 				if ( deviceId == wcharToString( portId ) && KinectGetPortIDByIndex( i, _countof( portId ), portId ) ) {
-					mKinect = KinectOpenSensor( portId );
+					mDeviceOptions.mDeviceHandle	= KinectOpenSensor( portId );
 					hr		= NuiCreateSensorById( portId, &mNuiSensor );
 					mDeviceOptions.setDeviceIndex( i );
 					break;
@@ -772,74 +882,80 @@ void Device::start( const DeviceOptions& deviceOptions )
 			}
 		}
 
-        if ( mKinect == KCB_INVALID_HANDLE ) {
-			if ( index >= 0 ) {
-				console() << "Unable to create device instance " + toString( index ) + ": " << endl;
-			} else if ( deviceId.length() > 0 ) {
-				console() << "Unable to create device instance " + deviceId + ":" << endl;
-			} else {
-				console() << "Invalid device name or index." << endl;
-			}
+        if ( mDeviceOptions.getDeviceHandle() == KCB_INVALID_HANDLE || mNuiSensor == 0 ) {
 			errorNui( hr );
 			mDeviceOptions.setDeviceIndex( -1 );
 			mDeviceOptions.setDeviceId( "" );
-			return;
+			if ( index >= 0 ) {
+				console() << "Unable to create device instance " + toString( index ) + ": " << endl;
+				throw ExcDeviceCreate( hr, deviceId );
+			} else if ( deviceId.length() > 0 ) {
+				console() << "Unable to create device instance " + deviceId + ":" << endl;
+				throw ExcDeviceCreate( hr, deviceId );
+			} else {
+				console() << "Invalid device name or index." << endl;
+				throw ExcDeviceInvalid( hr, deviceId );
+			}
 		}
 
-		KINECT_SENSOR_STATUS status = KinectGetKinectSensorStatus( mKinect );
+		KINECT_SENSOR_STATUS status = KinectGetKinectSensorStatus( mDeviceOptions.getDeviceHandle() );
 		statusKinect( status );
 		if ( status > 1 ) {
-			return;
+			throw ExcDeviceInit( status, deviceId );
 		}
 		
 		if ( mDeviceOptions.isColorEnabled() && mDeviceOptions.getColorResolution() != ImageResolution::NUI_IMAGE_RESOLUTION_INVALID ) {
 			KINECT_IMAGE_FRAME_FORMAT format	= { sizeof( KINECT_IMAGE_FRAME_FORMAT ), 0 };
 			mFormatColor						= format;
-			KinectEnableColorStream( mKinect, mDeviceOptions.getColorResolution(), &mFormatColor );
-            if ( KinectGetColorStreamStatus( mKinect ) != KINECT_STREAM_STATUS::KinectStreamStatusError ) {
+			KinectEnableColorStream( mDeviceOptions.getDeviceHandle(), mDeviceOptions.getColorResolution(), &mFormatColor );
+            if ( KinectGetColorStreamStatus( mDeviceOptions.getDeviceHandle() ) != KINECT_STREAM_STATUS::KinectStreamStatusError ) {
 				mBufferColor					= new uint8_t[ mFormatColor.cbBufferSize ];
 			} else {
 				mDeviceOptions.enableColor( false );
 				console() << "Unable to initialize color stream: ";
 				errorNui( hr );
+				throw ExcOpenStreamColor( hr, deviceId );
 			}
 		}
 
 		if ( mDeviceOptions.isDepthEnabled() && mDeviceOptions.getDepthResolution() != ImageResolution::NUI_IMAGE_RESOLUTION_INVALID ) {
 			KINECT_IMAGE_FRAME_FORMAT format	= { sizeof( KINECT_IMAGE_FRAME_FORMAT ), 0 };
 			mFormatDepth						= format;
-			KinectEnableDepthStream( mKinect, mDeviceOptions.isNearModeEnabled(), mDeviceOptions.getDepthResolution(), &mFormatDepth );
-            if ( KinectGetDepthStreamStatus( mKinect ) != KINECT_STREAM_STATUS::KinectStreamStatusError ) {
+			KinectEnableDepthStream( mDeviceOptions.getDeviceHandle(), mDeviceOptions.isNearModeEnabled(), mDeviceOptions.getDepthResolution(), &mFormatDepth );
+            if ( KinectGetDepthStreamStatus( mDeviceOptions.getDeviceHandle() ) != KINECT_STREAM_STATUS::KinectStreamStatusError ) {
 				mBufferDepth					= new uint8_t[ mFormatDepth.cbBufferSize ];
 			} else {
 				mDeviceOptions.enableDepth( false );
 				console() << "Unable to initialize depth stream: ";
 				errorNui( hr );
+				throw ExcOpenStreamDepth( hr, deviceId );
 			}
 		}
 
 		if ( mDeviceOptions.isInfraredEnabled() && mDeviceOptions.getInfraredResolution() != ImageResolution::NUI_IMAGE_RESOLUTION_INVALID ) {
 			KINECT_IMAGE_FRAME_FORMAT format	= { sizeof( KINECT_IMAGE_FRAME_FORMAT ), 0 };
 			mFormatInfrared						= format;
-			KinectEnableIRStream( mKinect, mDeviceOptions.getInfraredResolution(), &mFormatInfrared );
-            if ( KinectGetIRStreamStatus( mKinect ) != KINECT_STREAM_STATUS::KinectStreamStatusError ) {
+			KinectEnableIRStream( mDeviceOptions.getDeviceHandle(), mDeviceOptions.getInfraredResolution(), &mFormatInfrared );
+            if ( KinectGetIRStreamStatus( mDeviceOptions.getDeviceHandle() ) != KINECT_STREAM_STATUS::KinectStreamStatusError ) {
 				mBufferInfrared					= new uint8_t[ mFormatInfrared.cbBufferSize ];
 			} else {
 				mDeviceOptions.enableInfrared( false );
 				console() << "Unable to initialize infrared stream: ";
 				errorNui( hr );
+				throw ExcOpenStreamInfrared( hr, deviceId );
 			}
 		}
 
 		if ( mDeviceOptions.isUserTrackingEnabled() ) {
-			KinectEnableSkeletonStream( mKinect, mDeviceOptions.isSeatedModeEnabled(), 
+			KinectEnableSkeletonStream( mDeviceOptions.getDeviceHandle(), mDeviceOptions.isSeatedModeEnabled(), 
 				mDeviceOptions.getSkeletonSelectionMode(), &kTransformParams[ mDeviceOptions.getSkeletonTransform() ] );
-			if ( KinectGetSkeletonStreamStatus( mKinect ) != KINECT_STREAM_STATUS::KinectStreamStatusError ) {
+			if ( KinectGetSkeletonStreamStatus( mDeviceOptions.getDeviceHandle() ) != KINECT_STREAM_STATUS::KinectStreamStatusError ) {
 				mIsSkeletonDevice = true;
 			} else {
 				mDeviceOptions.enableUserTracking( false );
 				console() << "Unable to initialize user tracking: ";
 				errorNui( hr );
+				throw ExcUserTrackingEnable( hr, deviceId );
 			}
 		}
 
@@ -848,13 +964,20 @@ void Device::start( const DeviceOptions& deviceOptions )
 			mSkeletons.push_back( Skeleton() );
 		}
 
-		hr = KinectStartStreams( mKinect );
+		hr = KinectStartStreams( mDeviceOptions.getDeviceHandle() );
 		if ( FAILED( hr ) ) {
-			mCapture = false;
 			console() << "Unable to start the streams: ";
 			errorNui( hr );
+			throw ExcStreamStart( hr, deviceId );
 		}
 
+		hr = mNuiSensor->NuiGetCoordinateMapper( &mCoordinateMapper );
+		if ( FAILED( hr ) ) {
+			console() << "Unable to initialize coordinate mapper: ";
+			errorNui( hr );
+			throw ExcGetCoordinateMapper( hr, deviceId );
+		}
+		
 		mCapture = true;
 	}
 }
@@ -907,13 +1030,13 @@ void Device::stop()
 	if ( mBufferInfrared != nullptr ) {
 		delete [] mBufferInfrared;
 	}
-	KinectCloseSensor( mKinect );
+	KinectCloseSensor( mDeviceOptions.getDeviceHandle() );
 	init( true );
 }
 
 void Device::update()
 {
-	if ( !KinectAllFramesReady( mKinect ) ) {
+	if ( !KinectAllFramesReady( mDeviceOptions.getDeviceHandle() ) ) {
 		return;
 	}
 
@@ -929,20 +1052,20 @@ void Device::update()
 
 	long long timestamp;
 	if ( mDeviceOptions.isColorEnabled() && 
-		SUCCEEDED( KinectGetColorFrame( mKinect, mFormatColor.cbBufferSize, mBufferColor, &timestamp ) ) ) {
+		SUCCEEDED( KinectGetColorFrame( mDeviceOptions.getDeviceHandle(), mFormatColor.cbBufferSize, mBufferColor, &timestamp ) ) ) {
 		mSurfaceColor = Surface8u( mBufferColor, 
 			(int32_t)mFormatColor.dwWidth, (int32_t)mFormatColor.dwHeight, 
 			(int32_t)mFormatColor.dwWidth *(int32_t) mFormatColor.cbBytesPerPixel, 
 			SurfaceChannelOrder::BGRX );
 	}
 	if ( mDeviceOptions.isDepthEnabled() && 
-		SUCCEEDED( KinectGetDepthFrame( mKinect, mFormatDepth.cbBufferSize, mBufferDepth, &timestamp ) ) ) {
+		SUCCEEDED( KinectGetDepthFrame( mDeviceOptions.getDeviceHandle(), mFormatDepth.cbBufferSize, mBufferDepth, &timestamp ) ) ) {
 		mChannelDepth = Channel16u( (int32_t)mFormatDepth.dwWidth, (int32_t)mFormatDepth.dwHeight, 
 			(int32_t)mFormatDepth.dwWidth * (int32_t)mFormatDepth.cbBytesPerPixel, 0, 
 			(uint16_t*)mBufferDepth );
     }
 	if ( mDeviceOptions.isInfraredEnabled() && 
-		SUCCEEDED( KinectGetColorFrame( mKinect, mFormatInfrared.cbBufferSize, mBufferInfrared, &timestamp ) ) ) {
+		SUCCEEDED( KinectGetIRFrame( mDeviceOptions.getDeviceHandle(), mFormatInfrared.cbBufferSize, mBufferInfrared, &timestamp ) ) ) {
 		mChannelInfrared = Channel16u( (int32_t)mFormatInfrared.dwWidth, (int32_t)mFormatInfrared.dwHeight, 
 			(int32_t)mFormatInfrared.dwWidth * (int32_t)mFormatInfrared.cbBytesPerPixel, 0, 
 			(uint16_t*)mBufferInfrared );
@@ -950,7 +1073,7 @@ void Device::update()
 
 	NUI_SKELETON_FRAME skeletonFrame;
 	if ( mDeviceOptions.isUserTrackingEnabled() && 
-		SUCCEEDED( KinectGetSkeletonFrame( mKinect, &skeletonFrame ) ) ) {
+		SUCCEEDED( KinectGetSkeletonFrame( mDeviceOptions.getDeviceHandle(), &skeletonFrame ) ) ) {
 		for ( int32_t i = 0; i < NUI_SKELETON_COUNT; ++i ) {
 			mSkeletons.at( i ).clear();
 			NUI_SKELETON_TRACKING_STATE trackingState = skeletonFrame.SkeletonData[ i ].eTrackingState;
@@ -960,9 +1083,11 @@ void Device::update()
 				if ( FAILED( hr ) ) {
 					errorNui( hr );
 				}
-
 				for ( int32_t j = 0; j < (int32_t)NUI_SKELETON_POSITION_COUNT; ++j ) {
-					Bone bone( *( ( skeletonFrame.SkeletonData + i )->SkeletonPositions + j ), *( bones + j ) );
+					JointTrackingState trackingState = skeletonFrame.SkeletonData[ i ].eSkeletonPositionTrackingState[ j ];
+					Bone bone( *( ( skeletonFrame.SkeletonData + i )->SkeletonPositions + j ), 
+							   *( bones + j ), 
+							   trackingState );
 					( mSkeletons.begin() + i )->insert( std::pair<JointName, Bone>( (JointName)j, bone ) );
 				}
 			}
@@ -1010,19 +1135,39 @@ Device::ExcDeviceInvalid::ExcDeviceInvalid( long hr, const string& id ) throw()
 	sprintf( mMessage, "Invalid device ID or index: %s. Error: %i", id, hr );
 }
 
-Device::ExcOpenStreamColor::ExcOpenStreamColor( long hr )
+Device::ExcDeviceUnavailable::ExcDeviceUnavailable() throw()
 {
-	sprintf( mMessage, "Unable to open color stream. Error: %i", hr );
+	sprintf( mMessage, "No device available." );
 }
 
-Device::ExcOpenStreamDepth::ExcOpenStreamDepth( long hr )
+Device::ExcGetCoordinateMapper::ExcGetCoordinateMapper( long hr, const string& id ) throw()
 {
-	sprintf( mMessage, "Unable to open depth stream. Error: %i", hr );
+	sprintf( mMessage, "Unable to get coordinate mapper: %s. Error: %i", id, hr );
 }
 
-Device::ExcSkeletonTrackingEnable::ExcSkeletonTrackingEnable( long hr )
+Device::ExcOpenStreamColor::ExcOpenStreamColor( long hr, const string& id ) throw()
 {
-	sprintf( mMessage, "Unable to enable skeleton tracking. Error: %i", hr );
+	sprintf( mMessage, "Unable to open color stream: %s. Error: %i", hr );
+}
+
+Device::ExcOpenStreamDepth::ExcOpenStreamDepth( long hr, const string& id ) throw()
+{
+	sprintf( mMessage, "Unable to open depth stream. Error: %s: %i", hr );
+}
+
+Device::ExcOpenStreamInfrared::ExcOpenStreamInfrared( long hr, const string& id ) throw()
+{
+	sprintf( mMessage, "Unable to open infrared stream. Error: %s: %i", hr );
+}
+
+Device::ExcStreamStart::ExcStreamStart( long hr, const string& id ) throw()
+{
+	sprintf( mMessage, "Unable to start streams: %s. Error: %i", hr );
+}
+
+Device::ExcUserTrackingEnable::ExcUserTrackingEnable( long hr, const string& id ) throw()
+{
+	sprintf( mMessage, "Unable to enable user tracking: %s. Error: %i", hr );
 }
 }
  

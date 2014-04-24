@@ -49,24 +49,23 @@ namespace MsKinect
 {
 typedef std::shared_ptr<class FaceTracker> FaceTrackerRef;
 
+/*! Animation units representing a subset of Candide3 model's 
+	action units.
+	http://msdn.microsoft.com/en-us/library/jj130970.aspx 
+	http://www.icg.isy.liu.se/candide/ */
+enum : size_t
+{
+	AU0_UPPER_LIP_RAISER, AU1_JAW_LOWERER, AU2_LIP_STRETCHER, 
+	AU3_BROW_LOWERER, AU4_LIP_CORNER_DEPRESSOR, AU5_OUTER_BROW_RAISER	
+} typedef AnimationUnit;
+//! Tyoe definition for animation unit map.
+typedef std::map<AnimationUnit, float>	AnimationUnitMap;
+
 //! Microsoft FaceTracking API wrapper for use with the Kinect.
 class FaceTracker
 {
 public:
-	/*! Animation units representing a subset of Candide3 model's 
-		action units.
-		http://msdn.microsoft.com/en-us/library/jj130970.aspx 
-		http://www.icg.isy.liu.se/candide/ */
-	enum : size_t
-	{
-		AU0_UPPER_LIP_RAISER, AU1_JAW_LOWERER, AU2_LIP_STRETCHER, 
-		AU3_BROW_LOWERER, AU4_LIP_CORNER_DEPRESSOR, AU5_OUTER_BROW_RAISER	
-	} typedef AnimationUnit;
-	//! Tyoe definition for animation unit map.
-	typedef std::map<AnimationUnit, float>	AnimationUnitMap;
-
-	//////////////////////////////////////////////////////////////////////////////////////////////
-
+	
 	//! Structure containing face data.
 	class Face
 	{
@@ -82,10 +81,10 @@ public:
 		const ci::Rectf&				getBounds() const;
 		/*! Returns 3D TriMesh of face in world space. FaceTracker must 
 			have mesh calculation enabled. */
-		const ci::TriMesh&				getMesh() const;
+		const ci::TriMeshRef&			getMesh() const;
 		/*! Returns 2D TriMesh of face. Coordinates are projected into color image.
 			FaceTracker must have 2D mesh calculation enabled. */
-		const ci::TriMesh2d&			getMesh2d() const;
+		const ci::TriMeshRef&			getMesh2d() const;
 		//! Returns transform matrix of face's pose.
 		const ci::Matrix44f&			getPoseMatrix() const;
 		//! Returns ID provided in FaceTracker::findFaces().
@@ -93,8 +92,8 @@ public:
 	protected:
 		AnimationUnitMap				mAnimationUnits;
 		ci::Rectf						mBounds;
-		ci::TriMesh						mMesh;
-		ci::TriMesh2d					mMesh2d;
+		ci::TriMeshRef					mMesh;
+		ci::TriMeshRef					mMesh2d;
 		ci::Matrix44f					mPoseMatrix;
 		size_t							mUserId;
 
@@ -173,6 +172,7 @@ protected:
 	Face							mFace;
 	IFTFaceTracker*					mFaceTracker;
 	std::vector<ci::Vec3f>			mHeadPoints;
+	KCBHANDLE						mKinect;
 	IFTModel*						mModel;
 	IFTResult*						mResult;
 	FT_SENSOR_DATA					mSensorData;

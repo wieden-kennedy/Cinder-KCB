@@ -134,8 +134,26 @@ void UserApp::setup()
 			mFaceTracker->update( mFrame.getColorSurface(), mFrame.getDepthChannel() );
 		}
 	} );
-	mDevice->start();
-
+	try {
+		mDevice->start();
+	} catch ( MsKinect::Device::ExcDeviceCreate ex ) {
+		console() << ex.what() << endl;
+	} catch ( MsKinect::Device::ExcDeviceInit ex ) {
+		console() << ex.what() << endl;
+	} catch ( MsKinect::Device::ExcDeviceInvalid ex ) {
+		console() << ex.what() << endl;
+	} catch ( MsKinect::Device::ExcGetCoordinateMapper ex ) {
+		console() << ex.what() << endl;
+	} catch ( MsKinect::Device::ExcOpenStreamColor ex ) {
+		console() << ex.what() << endl;
+	} catch ( MsKinect::Device::ExcOpenStreamDepth ex ) {
+		console() << ex.what() << endl;
+	} catch ( MsKinect::Device::ExcStreamStart ex ) {
+		console() << ex.what() << endl;
+	} catch ( MsKinect::Device::ExcUserTrackingEnable ex ) {
+		console() << ex.what() << endl;
+	}
+	
 	mFaceTracker = MsKinect::FaceTracker::create();
 	mFaceTracker->enableCalcMesh( false );
 	mFaceTracker->enableCalcMesh2d();
