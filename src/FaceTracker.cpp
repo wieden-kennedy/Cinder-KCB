@@ -59,12 +59,12 @@ const Rectf& FaceTracker::Face::getBounds() const
 	return mBounds;
 }
 
-const TriMeshRef& FaceTracker::Face::getMesh() const
+const TriMesh& FaceTracker::Face::getMesh() const
 {
 	return mMesh;
 }
 
-const TriMeshRef& FaceTracker::Face::getMesh2d() const
+const TriMesh2d& FaceTracker::Face::getMesh2d() const
 {
 	return mMesh2d;
 }
@@ -336,7 +336,7 @@ void FaceTracker::run()
 							if ( SUCCEEDED( hr ) ) {
 								for ( size_t i = 0; i < numVertices; ++i ) {
 									Vec3f v( pts[ i ].x, pts[ i ].y, pts[ i ].z );
-									face.mMesh->appendVertex( v );
+									face.mMesh.appendVertex( v );
 								}
 
 								FT_TRIANGLE* triangles	= 0;
@@ -344,7 +344,7 @@ void FaceTracker::run()
 								hr = mModel->GetTriangles( &triangles, &triangleCount );
 								if ( SUCCEEDED( hr ) ) {
 									for ( size_t i = 0; i < triangleCount; ++i ) {
-										face.mMesh->appendTriangle( triangles[ i ].i, triangles[ i ].j, triangles[ i ].k );
+										face.mMesh.appendTriangle( triangles[ i ].i, triangles[ i ].j, triangles[ i ].k );
 									}
 								}
 							}
@@ -360,7 +360,7 @@ void FaceTracker::run()
 							if ( SUCCEEDED( hr ) ) {
 								for ( size_t i = 0; i < numVertices; ++i ) {
 									Vec2f v( pts[ i ].x + 0.5f, pts[ i ].y + 0.5f );
-									face.mMesh2d->appendVertex( v );
+									face.mMesh2d.appendVertex( v );
 								}
 
 								FT_TRIANGLE* triangles	= 0;
@@ -368,7 +368,7 @@ void FaceTracker::run()
 								hr = mModel->GetTriangles( &triangles, &triangleCount );
 								if ( SUCCEEDED( hr ) ) {
 									for ( size_t i = 0; i < triangleCount; ++i ) {
-										face.mMesh2d->appendTriangle( triangles[ i ].i, triangles[ i ].j, triangles[ i ].k );
+										face.mMesh2d.appendTriangle( triangles[ i ].i, triangles[ i ].j, triangles[ i ].k );
 									}
 								}
 							}

@@ -140,6 +140,8 @@ size_t									calcNumUsersFromDepth( const ci::Channel16u& depth );
 /*! Calculates confidence of \a skeleton between 0.0 and 1.0. Joints 
 	are weighted by distance to torso when \a weighted is true. */
 float									calcSkeletonConfidence( const Skeleton& skeleton, bool weighted = false );
+//! Shifts 16-bit depth data to make it visible.
+ci::Channel8u							channel16To8( const ci::Channel16u& channel );
 //! Creates a surface with colorized users from \a depth.
 ci::Surface16u							depthChannelToSurface( const ci::Channel16u& depth, 
 															  const DepthProcessOptions& depthProcessOptions = DepthProcessOptions() );
@@ -215,11 +217,11 @@ public:
 	//! Returns true if user tracking is enabled.
 	bool								isUserTrackingEnabled() const;
 
-	//! Enables color stream.
+	//! Enables color stream. Disables infrared stream.
 	DeviceOptions&						enableColor( bool enable = true );
 	//! Enables depth stream.
 	DeviceOptions&						enableDepth( bool enable = true );
-	//! Enables infrared stream.
+	//! Enables infrared stream. Disables color stream.
 	DeviceOptions&						enableInfrared( bool enable = true );
 	//! Enables near mode. Kinect for Windows only.
 	DeviceOptions&						enableNearMode( bool enable = true );

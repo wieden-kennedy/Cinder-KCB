@@ -233,6 +233,22 @@ float calcSkeletonConfidence( const Skeleton& skeleton, bool weighted )
 	return c;
 }
 
+Channel8u channel16To8( const Channel16u& channel )
+{
+	Channel8u channel8;
+	if ( channel ) {
+		channel8						= Channel8u( channel.getWidth(), channel.getHeight() );
+		Channel16u::ConstIter iter16	= channel.getIter();
+		Channel8u::Iter iter8			= channel8.getIter();
+		while ( iter8.line() && iter16.line() ) {
+			while ( iter8.pixel() && iter16.pixel() ) {
+				iter8.v()				= iter16.v() >> 4;
+			}
+		}
+	}
+	return channel8;
+}
+
 Surface16u depthChannelToSurface( const Channel16u& depth, const DepthProcessOptions& depthProcessOptions )
 {
 	Surface16u surface( depth );
@@ -427,6 +443,9 @@ mSkeletonSelectionMode( SkeletonSelectionMode::SkeletonSelectionModeDefault )
 DeviceOptions& DeviceOptions::enableColor( bool enable )
 {
 	mEnabledColor = enable;
+	if ( mEnabledColor ) {
+		mEnabledInfrared = false;
+	}
 	return *this;
 }
 
@@ -439,6 +458,9 @@ DeviceOptions& DeviceOptions::enableDepth( bool enable )
 DeviceOptions& DeviceOptions::enableInfrared( bool enable )
 {
 	mEnabledInfrared = enable;
+	if ( mEnabledInfrared ) {
+		mEnabledColor = false;
+	}
 	return *this;
 }
 
