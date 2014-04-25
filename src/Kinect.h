@@ -1,6 +1,6 @@
 /*
 * 
-* Copyright (c) 2013, Ban the Rewind
+* Copyright (c) 2014, Ban the Rewind, Wieden+Kennedy
 * All rights reserved.
 * 
 * Redistribution and use in source and binary forms, with or 
@@ -151,16 +151,6 @@ float									getDepthAtCoord( const ci::Channel16u& depth, const ci::Vec2i& v )
 size_t									getDeviceCount();
 //! Returns use color for user ID \a id.
 ci::Colorf								getUserColor( uint32_t id );
-//! Returns pixel location of color position in depth image.
-ci::Vec2i								mapColorCoordToDepth( const ci::Vec2i& v, const ci::Channel16u& depth, 
-															  const DeviceRef& device );
-//! Returns pixel location of color position in depth image.
-ci::Vec2i								mapDepthCoordToColor( const ci::Vec2i& v, const ci::Channel16u& depth, 
-															  const DeviceRef& device );
-//! Returns pixel location of skeleton position in color image. Requires depth resolution.
-ci::Vec2i								mapSkeletonCoordToColor( const ci::Vec3f& v, const DeviceRef& device );
-//! Returns pixel location of skeleton position in depth image.
-ci::Vec2i								mapSkeletonCoordToDepth( const ci::Vec3f& v, const DeviceRef& device );
 //! Returns user ID for pixel at \a coord in \a depth. 0 is no user.
 uint16_t								userIdFromDepthCoord( const ci::Channel16u& depth, const ci::Vec2i& v );
 
@@ -347,6 +337,15 @@ public:
 	//! Sets device angle to \a degrees. Default is 0.
 	void								setTilt( int32_t degrees = 0 );
 
+	//! Returns pixel location of color position in depth image.
+	ci::Vec2i							mapColorCoordToDepth( const ci::Vec2i& v );
+	//! Returns pixel location of color position in depth image.
+	ci::Vec2i							mapDepthCoordToColor( const ci::Vec2i& v );
+	//! Returns pixel location of skeleton position in color image.
+	ci::Vec2i							mapSkeletonCoordToColor( const ci::Vec3f& v );
+	//! Returns pixel location of skeleton position in depth image.
+	ci::Vec2i							mapSkeletonCoordToDepth( const ci::Vec3f& v );
+
 	//! Sets frame event handler. Signature is void( Frame ).
 	template<typename T, typename Y> 
 	inline void							connectEventHandler( T eventHandler, Y *obj )
@@ -355,8 +354,6 @@ public:
 	}
 	//! Sets frame event handler. Signature is void( Frame ).
 	void								connectEventHandler( const std::function<void ( Frame )>& eventHandler );
-
-	ci::Vec2f							test( const std::function<void ()>& eventHandler );
 protected:
 	static const int32_t				WAIT_TIME = 100;
 
@@ -395,10 +392,6 @@ protected:
 	std::string							wcharToString( wchar_t* v );
 	
 	friend void __stdcall				deviceStatus( long hr, const wchar_t* instanceName, const wchar_t* deviceId, void* data );
-	friend ci::Vec2i					mapDepthCoordToColor( const ci::Vec2i& v, const ci::Channel16u& depth, 
-															  const DeviceRef& device );
-	friend ci::Vec2i					mapSkeletonCoordToColor( const ci::Vec3f& v, const DeviceRef& device );
-	friend ci::Vec2i					mapSkeletonCoordToDepth( const ci::Vec3f& v, const DeviceRef& device );
 
 	//////////////////////////////////////////////////////////////////////////////////////////////
 

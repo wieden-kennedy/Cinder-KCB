@@ -1,6 +1,6 @@
 /*
 * 
-* Copyright (c) 2013, Wieden+Kennedy
+* Copyright (c) 2014, Ban the Rewind, Wieden+Kennedy
 * All rights reserved.
 * 
 * Redistribution and use in source and binary forms, with or 
@@ -81,14 +81,8 @@ void UserApp::draw()
 			for ( const auto& joint : skeleton ) {
 				const MsKinect::Bone& bone = joint.second;
 
-				Vec2i v0 = MsKinect::mapSkeletonCoordToDepth( 
-					bone.getPosition(), 
-					mDevice->getDeviceOptions().getDepthResolution() 
-					);
-				Vec2i v1 = MsKinect::mapSkeletonCoordToDepth( 
-					skeleton.at( bone.getStartJoint() ).getPosition(), 
-					mDevice->getDeviceOptions().getDepthResolution() 
-					);
+				Vec2i v0 = mDevice->mapSkeletonCoordToDepth( bone.getPosition() );
+				Vec2i v1 = mDevice->mapSkeletonCoordToDepth( skeleton.at( bone.getStartJoint() ).getPosition() );
 				gl::drawLine( v0, v1 );
 				gl::drawSolidCircle( v0, 5.0f, 16 );
 			}
@@ -123,7 +117,6 @@ void UserApp::keyDown( KeyEvent event )
 void UserApp::setup()
 {
 	setFrameRate( 60.0f );
-	setFullScreen( true );
 	glLineWidth( 2.0f );
 
 	mDevice = MsKinect::Device::create();

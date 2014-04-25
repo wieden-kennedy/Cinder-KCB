@@ -1,6 +1,6 @@
 /*
 * 
-* Copyright (c) 2013, Ban the Rewind
+* Copyright (c) 2014, Ban the Rewind, Wieden+Kennedy
 * All rights reserved.
 * 
 * Redistribution and use in source and binary forms, with or 
@@ -113,12 +113,12 @@ void ParticleApp::draw()
 			mTextureDepth->bind( 2 );
 			
 			mShaderGpGpu->bind();
-			mShaderGpGpu->uniform( "center",		mParticleCenter );
-			mShaderGpGpu->uniform( "dampen",		mParticleDampen );
-			mShaderGpGpu->uniform( "kinect",		2 );
-			mShaderGpGpu->uniform( "positions",		0 );
-			mShaderGpGpu->uniform( "speed",			mParticleSpeed );
-			mShaderGpGpu->uniform( "velocities",	1 );
+			mShaderGpGpu->uniform( "uCenter",			mParticleCenter );
+			mShaderGpGpu->uniform( "uDampen",			mParticleDampen );
+			mShaderGpGpu->uniform( "uSpeed",			mParticleSpeed );
+			mShaderGpGpu->uniform( "uTextureKinect",	2 );
+			mShaderGpGpu->uniform( "uTexturePosition",	0 );
+			mShaderGpGpu->uniform( "uTextureVelocity",	1 );
 		
 			gl::drawSolidRect( mFbo[ pong ].getBounds(), false );
 			
@@ -148,9 +148,9 @@ void ParticleApp::draw()
 			mFbo[ pong ].bindTexture();
 
 			mShaderDraw->bind();
-			mShaderDraw->uniform( "depth",		mPointCloudDepth );
-			mShaderDraw->uniform( "positions",	0 );
-			mShaderDraw->uniform( "time",		(float)getElapsedSeconds() );
+			mShaderDraw->uniform( "uDepth",		mPointCloudDepth );
+			mShaderDraw->uniform( "uPositions",	0 );
+			mShaderDraw->uniform( "uTime",		(float)getElapsedSeconds() );
 
 			gl::draw( mMesh );
 
@@ -202,7 +202,6 @@ void ParticleApp::onFrame( MsKinect::Frame frame )
 void ParticleApp::prepareSettings( Settings* settings )
 {
 	settings->setFrameRate( 60.0f );
-	settings->setFullScreen( true );
 	settings->setWindowSize( 1280, 720 );
 }
 
@@ -240,7 +239,7 @@ void ParticleApp::setup()
 	////////////////////////////////////////////////////////////////
 	// Define properties
 
-	mDrawParams			= false;
+	mDrawParams			= true;
 	mDrawTextures		= false;
 	mEyePoint			= Vec3f( 0.0f, 0.0f, 3000.0f );
 	mFrameRate			= 0.0f;

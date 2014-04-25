@@ -1,6 +1,6 @@
 /*
 * 
-* Copyright (c) 2013, Wieden+Kennedy
+* Copyright (c) 2014, Ban the Rewind, Wieden+Kennedy
 * All rights reserved.
 * 
 * Redistribution and use in source and binary forms, with or 

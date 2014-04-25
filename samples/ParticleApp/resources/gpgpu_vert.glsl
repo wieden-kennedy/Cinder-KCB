@@ -1,8 +1,8 @@
-varying vec2 uv;
+varying vec2 vUv;
 
 void main ( void )
 {
-	uv			= gl_MultiTexCoord0.st;
+	vUv			= gl_MultiTexCoord0.st;
 	gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;
 }
  

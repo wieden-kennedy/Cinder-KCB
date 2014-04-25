@@ -1,6 +1,6 @@
 /*
 * 
-* Copyright (c) 2013, Ban the Rewind
+* Copyright (c) 2014, Ban the Rewind, Wieden+Kennedy
 * All rights reserved.
 * 
 * Redistribution and use in source and binary forms, with or 
@@ -339,79 +339,6 @@ Colorf getUserColor( uint32_t id )
 	default:
 		return Colorf::white();
 	}
-}
-
-Vec2i mapColorCoordToDepth( const Vec2i& v, const Channel16u& depth, const DeviceRef& device )
-{
-	long x;
-	long y;
-	if ( depth && device ) {
-		NuiImageGetColorPixelCoordinatesFromDepthPixelAtResolution( 
-			device->getDeviceOptions().getColorResolution(), 
-			device->getDeviceOptions().getDepthResolution(), 
-			0, v.x, v.y, 
-			depth.getValue( v ), &x, &y );
-	}
-	return Vec2i( (int32_t)x, (int32_t)y );
-}
-
-Vec2i mapDepthCoordToColor( const Vec2i& v, const Channel16u& depth, const DeviceRef& device )
-{
-	NUI_COLOR_IMAGE_POINT mapped;
-	if ( depth && device && device->getCoordinateMapper() ) {
-		NUI_DEPTH_IMAGE_POINT p;
-		p.x		= v.x;
-		p.y		= v.y;
-		p.depth	= depth.getValue( v );
-		long hr = device->getCoordinateMapper()->MapDepthPointToColorPoint( 
-			device->getDeviceOptions().getDepthResolution(), &p, 
-			NUI_IMAGE_TYPE::NUI_IMAGE_TYPE_COLOR_INFRARED, 
-			device->getDeviceOptions().getColorResolution(), &mapped 
-			);
-		if ( FAILED( hr ) ) {
-			device->errorNui( hr );
-		}
-	}
-	return Vec2i( mapped.x, mapped.y );
-}
-
-Vec2i mapSkeletonCoordToColor( const Vec3f& v, const DeviceRef& device )
-{
-	NUI_COLOR_IMAGE_POINT mapped;
-	if ( device && device->getCoordinateMapper() ) {
-		Vector4 p;
-		p.x		= v.x;
-		p.y		= v.y;
-		p.z		= v.z;
-		p.w		= 0.0f;
-		long hr	= device->getCoordinateMapper()->MapSkeletonPointToColorPoint( 
-			&p, NUI_IMAGE_TYPE::NUI_IMAGE_TYPE_COLOR, 
-			device->getDeviceOptions().getColorResolution(), &mapped 
-			);
-		if ( FAILED( hr ) ) {
-			device->errorNui( hr );
-		}
-	}
-	return Vec2i( mapped.x, mapped.y );
-}
-
-Vec2i mapSkeletonCoordToDepth( const Vec3f& v, const DeviceRef& device )
-{
-	NUI_DEPTH_IMAGE_POINT mapped;
-	if ( device && device->getCoordinateMapper() ) {
-		Vector4 p;
-		p.x		= v.x;
-		p.y		= v.y;
-		p.z		= v.z;
-		p.w		= 0.0f;
-		long hr	= device->getCoordinateMapper()->MapSkeletonPointToDepthPoint( 
-			&p, device->getDeviceOptions().getDepthResolution(), &mapped 
-			);
-		if ( FAILED( hr ) ) {
-			device->errorNui( hr );
-		}
-	}
-	return Vec2i( mapped.x, mapped.y );
 }
 
 uint16_t userIdFromDepthCoord( const Channel16u& depth, const Vec2i& v )
@@ -851,6 +778,82 @@ void Device::init( bool reset )
 bool Device::isCapturing() const 
 {
 	return mCapture; 
+}
+
+Vec2i Device::mapColorCoordToDepth( const Vec2i& v )
+{
+	long x;
+	long y;
+	if ( mChannelDepth ) {
+		long hr = NuiImageGetColorPixelCoordinatesFromDepthPixelAtResolution( 
+			mDeviceOptions.getColorResolution(), 
+			mDeviceOptions.getDepthResolution(), 
+			0, v.x, v.y, 
+			mChannelDepth.getValue( v ), &x, &y );
+		if ( FAILED( hr ) ) {
+			errorNui( hr );
+		}
+	}
+	return Vec2i( (int32_t)x, (int32_t)y );
+}
+
+Vec2i Device::mapDepthCoordToColor( const Vec2i& v )
+{
+	NUI_COLOR_IMAGE_POINT mapped;
+	if ( mChannelDepth && mCoordinateMapper ) {
+		NUI_DEPTH_IMAGE_POINT p;
+		p.x		= v.x;
+		p.y		= v.y;
+		p.depth	= mChannelDepth.getValue( v );
+		long hr = mCoordinateMapper->MapDepthPointToColorPoint( 
+			mDeviceOptions.getDepthResolution(), &p, 
+			NUI_IMAGE_TYPE::NUI_IMAGE_TYPE_COLOR_INFRARED, 
+			mDeviceOptions.getColorResolution(), &mapped 
+			);
+		if ( FAILED( hr ) ) {
+			errorNui( hr );
+		}
+	}
+	return Vec2i( mapped.x, mapped.y );
+}
+
+Vec2i Device::mapSkeletonCoordToColor( const Vec3f& v )
+{
+	NUI_COLOR_IMAGE_POINT mapped;
+	if ( mCoordinateMapper ) {
+		Vector4 p;
+		p.x		= v.x;
+		p.y		= v.y;
+		p.z		= v.z;
+		p.w		= 0.0f;
+		long hr	= mCoordinateMapper->MapSkeletonPointToColorPoint( 
+			&p, NUI_IMAGE_TYPE::NUI_IMAGE_TYPE_COLOR, 
+			mDeviceOptions.getColorResolution(), &mapped 
+			);
+		if ( FAILED( hr ) ) {
+			errorNui( hr );
+		}
+	}
+	return Vec2i( mapped.x, mapped.y );
+}
+
+Vec2i Device::mapSkeletonCoordToDepth( const Vec3f& v )
+{
+	NUI_DEPTH_IMAGE_POINT mapped;
+	if ( mCoordinateMapper ) {
+		Vector4 p;
+		p.x		= v.x;
+		p.y		= v.y;
+		p.z		= v.z;
+		p.w		= 0.0f;
+		long hr	= mCoordinateMapper->MapSkeletonPointToDepthPoint( 
+			&p, mDeviceOptions.getDepthResolution(), &mapped 
+			);
+		if ( FAILED( hr ) ) {
+			errorNui( hr );
+		}
+	}
+	return Vec2i( mapped.x, mapped.y );
 }
 
 void Device::setTilt( int32_t degrees )
