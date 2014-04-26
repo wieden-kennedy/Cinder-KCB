@@ -35,6 +35,7 @@
 */
 
 #include "cinder/app/AppBasic.h"
+#include "cinder/app/RendererGl.h"
 #include "cinder/gl/Texture.h"
 #include "Kinect.h"
 
@@ -56,11 +57,11 @@ using namespace std;
 
 void BasicApp::draw()
 {
-	gl::setViewport( getWindowBounds() );
+	gl::viewport( getWindowSize() );
 	gl::clear();
 	gl::setMatricesWindow( getWindowSize() );
+	
 	gl::translate( 0.0f, getWindowCenter().y * 0.5f );
-
 	Rectf bounds = Rectf( getWindowBounds() ) * 0.5f;
 	if ( mTextureColor ) {
 		gl::draw( mTextureColor, mTextureColor->getBounds(), bounds );
@@ -87,7 +88,6 @@ void BasicApp::setup()
 {
 	gl::color( ColorAf::white() );
 	gl::enable( GL_TEXTURE_2D );
-	setFrameRate( 60.0f );
 	
 	mDevice = MsKinect::Device::create();
 	mDevice->connectEventHandler( [ & ]( MsKinect::Frame frame )
@@ -108,3 +108,4 @@ void BasicApp::setup()
 }
 
 CINDER_APP_BASIC( BasicApp, RendererGl )
+ 

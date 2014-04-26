@@ -81,10 +81,10 @@ public:
 		const ci::Rectf&				getBounds() const;
 		/*! Returns 3D TriMesh of face in world space. FaceTracker must 
 			have mesh calculation enabled. */
-		const ci::TriMesh&				getMesh() const;
+		const ci::TriMeshRef&			getMesh() const;
 		/*! Returns 2D TriMesh of face. Coordinates are projected into color image.
 			FaceTracker must have 2D mesh calculation enabled. */
-		const ci::TriMesh2d&			getMesh2d() const;
+		const ci::TriMeshRef&			getMesh2d() const;
 		//! Returns transform matrix of face's pose.
 		const ci::Matrix44f&			getPoseMatrix() const;
 		//! Returns ID provided in FaceTracker::findFaces().
@@ -92,8 +92,8 @@ public:
 	protected:
 		AnimationUnitMap				mAnimationUnits;
 		ci::Rectf						mBounds;
-		ci::TriMesh						mMesh;
-		ci::TriMesh2d					mMesh2d;
+		ci::TriMeshRef					mMesh;
+		ci::TriMeshRef					mMesh2d;
 		ci::Matrix44f					mPoseMatrix;
 		size_t							mUserId;
 

@@ -1,6 +1,6 @@
 /*
 * 
-* Copyright (c) 2014, Ban the Rewind, Wieden+Kennedy
+* Copyright (c) 2013, Wieden+Kennedy
 * All rights reserved.
 * 
 * Redistribution and use in source and binary forms, with or 
@@ -35,42 +35,40 @@
 */
 
 #include "cinder/app/AppBasic.h"
-#include "cinder/app/RendererGl.h"
-#include "cinder/gl/Context.h"
 #include "cinder/gl/Texture.h"
 #include "cinder/params/Params.h"
-#include "FaceTracker.h"
+#include "HandTracker.h"
 #include "Kinect.h"
 
-class UserApp : public ci::app::AppBasic 
+class HandApp : public ci::app::AppBasic 
 {
 public:
-	void 						draw();	
-	void						keyDown( ci::app::KeyEvent event );
-	void 						setup();
+	void 										draw();	
+	void										keyDown( ci::app::KeyEvent event );
+	void 										setup();
 private:
-	MsKinect::DeviceRef			mDevice;
-	MsKinect::Frame				mFrame;
-	
-	MsKinect::FaceTracker::Face	mFace;
-	MsKinect::FaceTrackerRef	mFaceTracker;
+	MsKinect::DeviceRef							mDevice;
+	MsKinect::Frame								mFrame;
+	MsKinect::HandTrackerRef					mHandTracker;
+	std::vector<MsKinect::HandTracker::Hand>	mHands;
 };
 
 using namespace ci;
 using namespace ci::app;
 using namespace std;
 
-void UserApp::draw()
+void HandApp::draw()
 {
-	gl::viewport( getWindowSize() );
+	gl::setViewport( getWindowBounds() );
 	gl::clear();
 	gl::setMatricesWindow( getWindowSize() );
-	gl::enableAlphaBlending();
-	gl::color( ColorAf::white() );
 	
 	if ( mFrame.getDepthChannel() ) {
-		gl::enable( GL_TEXTURE_2D );
+
 		gl::TextureRef tex = gl::Texture::create( mFrame.getDepthChannel() );
+
+		gl::color( ColorAf::white() );
+		gl::enable( GL_TEXTURE_2D );
 		gl::draw( tex, tex->getBounds(), getWindowBounds() );
 		gl::disable( GL_TEXTURE_2D );
 
@@ -81,28 +79,30 @@ void UserApp::draw()
 			for ( const auto& joint : skeleton ) {
 				const MsKinect::Bone& bone = joint.second;
 
-				Vec2i v0 = mDevice->mapSkeletonCoordToDepth( bone.getPosition() );
-				Vec2i v1 = mDevice->mapSkeletonCoordToDepth( skeleton.at( bone.getStartJoint() ).getPosition() );
+				Vec2i v0 = MsKinect::mapSkeletonCoordToDepth( 
+					bone.getPosition(), 
+					mDevice->getDeviceOptions().getDepthResolution() 
+					);
+				Vec2i v1 = MsKinect::mapSkeletonCoordToDepth( 
+					skeleton.at( bone.getStartJoint() ).getPosition(), 
+					mDevice->getDeviceOptions().getDepthResolution() 
+					);
 				gl::drawLine( v0, v1 );
 				gl::drawSolidCircle( v0, 5.0f, 16 );
 			}
 		}
 
-		if ( mFace.getMesh2d()->getNumVertices() > 0 ) {
-			gl::pushMatrices();
-			gl::scale( 0.5f, 0.5f );
-			gl::color( ColorAf::white() );
-			gl::enableWireframe();
-			gl::draw( *mFace.getMesh2d() );
-			gl::disableWireframe();
-			gl::popMatrices();
+		for ( const auto& hand : mHands ) {
+			for ( const auto& finger : hand.getFingerTipPositions() ) {
+				gl::drawStrokedCircle( finger, 5.0f, 24 );
+			}
 		}
 
 		gl::popMatrices();
 	}
 }
 
-void UserApp::keyDown( KeyEvent event )
+void HandApp::keyDown( KeyEvent event )
 {
 	switch ( event.getCode() ) {
 	case KeyEvent::KEY_f:
@@ -114,17 +114,16 @@ void UserApp::keyDown( KeyEvent event )
 	}
 }
 
-void UserApp::setup()
+void HandApp::setup()
 {
 	setFrameRate( 60.0f );
-	glLineWidth( 2.0f );
 
 	mDevice = MsKinect::Device::create();
 	mDevice->connectEventHandler( [ & ]( MsKinect::Frame frame )
 	{
 		mFrame = frame;
-		if ( mFaceTracker ) {
-			mFaceTracker->update( mFrame.getColorSurface(), mFrame.getDepthChannel() );
+		if ( mHandTracker ) {
+			mHandTracker->update( mFrame.getDepthChannel(), mFrame.getSkeletons() );
 		}
 	} );
 	try {
@@ -146,14 +145,13 @@ void UserApp::setup()
 	} catch ( MsKinect::Device::ExcUserTrackingEnable ex ) {
 		console() << ex.what() << endl;
 	}
-	
-	mFaceTracker = MsKinect::FaceTracker::create();
-	mFaceTracker->enableCalcMesh( false );
-	mFaceTracker->enableCalcMesh2d();
-	mFaceTracker->connectEventHander( [ & ]( MsKinect::FaceTracker::Face face ) {
-		mFace = face;
+
+	mHandTracker = MsKinect::HandTracker::create();
+	mHandTracker->connectEventHander( [ & ]( vector<MsKinect::HandTracker::Hand> hands )
+	{
+		mHands = hands;
 	} );
-	mFaceTracker->start();
+	mHandTracker->start( mDevice->getDeviceOptions() );
 }
 
-CINDER_APP_BASIC( UserApp, RendererGl )
+CINDER_APP_BASIC( HandApp, RendererGl )

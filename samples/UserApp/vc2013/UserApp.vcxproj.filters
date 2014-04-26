@@ -18,12 +18,9 @@
     <Filter Include="blocks\Cinder-KCB\lib">
       <UniqueIdentifier>{9efc914e-bd85-4865-b4d4-e561e1274ebc}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header Files">
-      <UniqueIdentifier>{ba08cdeb-8543-4f0f-a42f-20b11eb21927}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\src\ParticleApp.cpp">
+    <ClCompile Include="..\src\UserApp.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\Kinect.cpp">
@@ -53,22 +50,5 @@
     <ClInclude Include="..\..\..\lib\KinectCommonBridgeLib.h">
       <Filter>blocks\Cinder-KCB\lib</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\Resources.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="..\resources\draw_frag.glsl">
-      <Filter>Resource Files</Filter>
-    </None>
-    <None Include="..\resources\draw_vert.glsl">
-      <Filter>Resource Files</Filter>
-    </None>
-    <None Include="..\resources\gpgpu_frag.glsl">
-      <Filter>Resource Files</Filter>
-    </None>
-    <None Include="..\resources\gpgpu_vert.glsl">
-      <Filter>Resource Files</Filter>
-    </None>
   </ItemGroup>
 </Project>

@@ -98,7 +98,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\..\..\..\..\include;..\..\..\..\..\boost;..\..\..\lib;..\..\..\src;$(KINECTSDK10_DIR)\inc;$(KINECT_TOOLKIT_DIR)inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\include;..\..\..\..\..\include;..\..\..\..\..\boost;..\..\..\lib;..\..\..\src;$(KINECTSDK10_DIR)\inc;$(KINECT_TOOLKIT_DIR)inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -109,7 +109,7 @@
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>cinder-$(PlatformToolset)_d.lib;Kinect10.lib;KinectCommonBridge.lib;FaceTrackLib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>cinder-$(PlatformToolset)_d.lib;Kinect10.lib;KinectCommonBridge.lib;FaceTrackLib.lib;OpenGL32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>..\..\..\..\..\lib;..\..\..\..\..\lib\msw\$(PlatformTarget);..\..\..\lib\$(PlatformTarget)\lib\$(Configuration)\$(PlatformToolset);$(KINECTSDK10_DIR)\lib\x86;$(KINECT_TOOLKIT_DIR)Lib\x86;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
@@ -124,7 +124,7 @@
 xcopy "$(KINECT_TOOLKIT_DIR)Redist\x86\Face*.*" "$(OutDir)" /Y /C</Command>
     </PreBuildEvent>
     <ResourceCompile>
-      <AdditionalIncludeDirectories>..\..\..\..\..\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\include;..\..\..\..\..\include</AdditionalIncludeDirectories>
     </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -140,7 +140,7 @@ xcopy "$(KINECT_TOOLKIT_DIR)Redist\x86\Face*.*" "$(OutDir)" /Y /C</Command>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>cinder-$(PlatformToolset)_d.lib;Kinect10.lib;KinectCommonBridge.lib;FaceTrackLib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>cinder-$(PlatformToolset)_d.lib;Kinect10.lib;KinectCommonBridge.lib;FaceTrackLib.lib;OpenGL32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>..\..\..\..\..\lib;..\..\..\..\..\lib\msw\$(PlatformTarget);..\..\..\lib\$(PlatformTarget)\lib\$(Configuration)\$(PlatformToolset);$(KINECTSDK10_DIR)\lib\amd64;$(KINECT_TOOLKIT_DIR)Lib\amd64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
@@ -159,7 +159,7 @@ xcopy "$(KINECT_TOOLKIT_DIR)Redist\amd64\Face*.*" "$(OutDir)" /Y /C</Command>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
-      <AdditionalIncludeDirectories>..\..\..\..\..\include;..\..\..\..\..\boost;..\..\..\lib;..\..\..\src;$(KINECTSDK10_DIR)\inc;$(KINECT_TOOLKIT_DIR)inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\include;..\..\..\..\..\include;..\..\..\..\..\boost;..\..\..\lib;..\..\..\src;$(KINECTSDK10_DIR)\inc;$(KINECT_TOOLKIT_DIR)inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <PrecompiledHeader>
@@ -171,7 +171,7 @@ xcopy "$(KINECT_TOOLKIT_DIR)Redist\amd64\Face*.*" "$(OutDir)" /Y /C</Command>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>
     </ProjectReference>
     <Link>
-      <AdditionalDependencies>cinder-$(PlatformToolset).lib;Kinect10.lib;KinectCommonBridge.lib;FaceTrackLib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>cinder-$(PlatformToolset).lib;Kinect10.lib;KinectCommonBridge.lib;FaceTrackLib.lib;OpenGL32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>..\..\..\..\..\lib;..\..\..\..\..\lib\msw\$(PlatformTarget);..\..\..\lib\$(PlatformTarget)\lib\$(Configuration)\$(PlatformToolset);$(KINECTSDK10_DIR)\lib\x86;$(KINECT_TOOLKIT_DIR)Lib\x86;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>false</GenerateDebugInformation>
       <GenerateMapFile>true</GenerateMapFile>
@@ -189,7 +189,7 @@ xcopy "$(KINECT_TOOLKIT_DIR)Redist\amd64\Face*.*" "$(OutDir)" /Y /C</Command>
 xcopy "$(KINECT_TOOLKIT_DIR)Redist\x86\Face*.*" "$(OutDir)" /Y /C</Command>
     </PreBuildEvent>
     <ResourceCompile>
-      <AdditionalIncludeDirectories>..\..\..\..\..\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\include;..\..\..\..\..\include</AdditionalIncludeDirectories>
     </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -206,7 +206,7 @@ xcopy "$(KINECT_TOOLKIT_DIR)Redist\x86\Face*.*" "$(OutDir)" /Y /C</Command>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>
     </ProjectReference>
     <Link>
-      <AdditionalDependencies>cinder-$(PlatformToolset).lib;Kinect10.lib;KinectCommonBridge.lib;FaceTrackLib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>cinder-$(PlatformToolset).lib;Kinect10.lib;KinectCommonBridge.lib;FaceTrackLib.lib;OpenGL32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>..\..\..\..\..\lib;..\..\..\..\..\lib\msw\$(PlatformTarget);..\..\..\lib\$(PlatformTarget)\lib\$(Configuration)\$(PlatformToolset);$(KINECTSDK10_DIR)\lib\amd64;$(KINECT_TOOLKIT_DIR)Lib\amd64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>false</GenerateDebugInformation>
       <GenerateMapFile>true</GenerateMapFile>
