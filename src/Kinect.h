@@ -46,12 +46,18 @@
 #include "cinder/Exception.h"
 #include "cinder/Matrix.h"
 #include "cinder/Quaternion.h"
+#include "cinder/Rect.h"
 #include "cinder/Surface.h"
+#include "cinder/TriMesh.h"
+#include "FaceTrackLib.h"
 #include <functional>
+#include "KinectCommonBridgeLib.h"
 #include <list>
 #include <map>
+#include <memory>
+#include <mutex>
 #include "ole2.h"
-#include "KinectCommonBridgeLib.h"
+#include <thread>
 #include <vector>
 
 //! Kinect SDK wrapper for Cinder
@@ -65,37 +71,30 @@ typedef NUI_SKELETON_POSITION_INDEX				JointName;
 typedef NUI_SKELETON_POSITION_TRACKING_STATE	JointTrackingState;
 typedef KINECT_SKELETON_SELECTION_MODE			SkeletonSelectionMode;
 typedef std::shared_ptr<Device>					DeviceRef;
+typedef std::shared_ptr<class FaceTracker>		FaceTrackerRef;
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 
-class DepthProcessOptions
+/*! Animation units representing a subset of Candide3 model's 
+	action units.
+	http://msdn.microsoft.com/en-us/library/jj130970.aspx 
+	http://www.icg.isy.liu.se/candide/ */
+enum : size_t
 {
-public:
-	DepthProcessOptions();
+	AU0_UPPER_LIP_RAISER, AU1_JAW_LOWERER, AU2_LIP_STRETCHER, 
+	AU3_BROW_LOWERER, AU4_LIP_CORNER_DEPRESSOR, AU5_OUTER_BROW_RAISER	
+} typedef AnimationUnit;
+//! Tyoe definition for animation unit map.
+typedef std::map<AnimationUnit, float>	AnimationUnitMap;
 
-	/*! Enables binary mode where background is black and users 
-		are white. Set \a inverted to true to reverse. Enabling 
-		binary mode also enables background removal. */
-	DepthProcessOptions&				enableBinary( bool enable = true, bool inverted = false );
-	//! Normalizes non-user pixels.
-	DepthProcessOptions&				enableRemoveBackground( bool enable = true );
-	//! Colorizes user pixels.
-	DepthProcessOptions&				enableUserColor( bool enable = true );
+//////////////////////////////////////////////////////////////////////////////////////////////
 
-	//! Returns true if image is black and white.
-	bool								isBinaryEnabled() const;
-	//! Returns true if black and white image is inverted.
-	bool								isBinaryInverted() const;
-	//! Returns true if background removal is enabled.
-	bool								isRemoveBackgroundEnabled() const;
-	//! Returns true if user colorization is enabled.
-	bool								isUserColorEnabled() const;
-protected:
-	bool								mBinary;
-	bool								mBinaryInverted;
-	bool								mRemoveBackground;
-	bool								mUserColor;
-};
+/*! Skeleton smoothing enumeration. Smoother transform improves skeleton accuracy, 
+	but increases latency. */
+enum : uint_fast8_t
+{
+	TRANSFORM_NONE, TRANSFORM_DEFAULT, TRANSFORM_SMOOTH, TRANSFORM_VERY_SMOOTH, TRANSFORM_MAX
+} typedef								SkeletonTransform;
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -135,36 +134,6 @@ typedef std::map<JointName, Bone>		Skeleton;
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 
-//! Counts the number of users in \a depth.
-size_t									calcNumUsersFromDepth( const ci::Channel16u& depth );
-/*! Calculates confidence of \a skeleton between 0.0 and 1.0. Joints 
-	are weighted by distance to torso when \a weighted is true. */
-float									calcSkeletonConfidence( const Skeleton& skeleton, bool weighted = false );
-//! Shifts 16-bit depth data to make it visible.
-ci::Channel8u							channel16To8( const ci::Channel16u& channel );
-//! Creates a surface with colorized users from \a depth.
-ci::Surface16u							depthChannelToSurface( const ci::Channel16u& depth, 
-															  const DepthProcessOptions& depthProcessOptions = DepthProcessOptions() );
-//! Returns depth value as 0.0 - 1.0 float for pixel at \a pos.
-float									getDepthAtCoord( const ci::Channel16u& depth, const ci::Vec2i& v );
-//! Returns number of Kinect devices.
-size_t									getDeviceCount();
-//! Returns use color for user ID \a id.
-ci::Colorf								getUserColor( uint32_t id );
-//! Returns user ID for pixel at \a coord in \a depth. 0 is no user.
-uint16_t								userIdFromDepthCoord( const ci::Channel16u& depth, const ci::Vec2i& v );
-
-//////////////////////////////////////////////////////////////////////////////////////////////
-
-/*! Skeleton smoothing enumeration. Smoother transform improves skeleton accuracy, 
-	but increases latency. */
-enum : uint_fast8_t
-{
-	TRANSFORM_NONE, TRANSFORM_DEFAULT, TRANSFORM_SMOOTH, TRANSFORM_VERY_SMOOTH, TRANSFORM_MAX
-} typedef								SkeletonTransform;
-
-//////////////////////////////////////////////////////////////////////////////////////////////
-
 class DeviceOptions
 {
 public:
@@ -198,6 +167,8 @@ public:
 	bool								isColorEnabled() const;
 	//! Returns true if depth tracking is enabled.
 	bool								isDepthEnabled() const;
+	//! Returns true if face tracking is enabled.
+	bool								isFaceTrackingEnabled() const;
 	//! Returns true if infrared stream is enabled.
 	bool								isInfraredEnabled() const;
 	//! Returns true if near mode is enabled.
@@ -211,6 +182,8 @@ public:
 	DeviceOptions&						enableColor( bool enable = true );
 	//! Enables depth stream.
 	DeviceOptions&						enableDepth( bool enable = true );
+	//! Enables face tracking.
+	DeviceOptions&						enableFaceTracking( bool enable = true );
 	//! Enables infrared stream. Disables color stream.
 	DeviceOptions&						enableInfrared( bool enable = true );
 	//! Enables near mode. Kinect for Windows only.
@@ -237,6 +210,7 @@ public:
 protected:
 	bool								mEnabledColor;
 	bool								mEnabledDepth;
+	bool								mEnabledFaceTracking;
 	bool								mEnabledInfrared;
 	bool								mEnabledNearMode;
 	bool								mEnabledSeatedMode;
@@ -261,6 +235,198 @@ protected:
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 
+class DepthProcessOptions
+{
+public:
+	DepthProcessOptions();
+
+	/*! Enables binary mode where background is black and users 
+		are white. Set \a inverted to true to reverse. Enabling 
+		binary mode also enables background removal. */
+	DepthProcessOptions&				enableBinary( bool enable = true, bool inverted = false );
+	//! Normalizes non-user pixels.
+	DepthProcessOptions&				enableRemoveBackground( bool enable = true );
+	//! Colorizes user pixels.
+	DepthProcessOptions&				enableUserColor( bool enable = true );
+
+	//! Returns true if image is black and white.
+	bool								isBinaryEnabled() const;
+	//! Returns true if black and white image is inverted.
+	bool								isBinaryInverted() const;
+	//! Returns true if background removal is enabled.
+	bool								isRemoveBackgroundEnabled() const;
+	//! Returns true if user colorization is enabled.
+	bool								isUserColorEnabled() const;
+protected:
+	bool								mBinary;
+	bool								mBinaryInverted;
+	bool								mRemoveBackground;
+	bool								mUserColor;
+};
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+
+//! Structure containing face data.
+class Face
+{
+public:
+	Face();
+
+	/*! Returns animation unit (AU) map. First value is an 
+		AnimationUnit enumerator. The second value is a float 
+		between -1.0 and 1.0. See:
+		http://msdn.microsoft.com/en-us/library/jj130970.aspx */
+	const AnimationUnitMap&				getAnimationUnits() const;
+	//! Returns rectangle of face location in pixels inside the color image.
+	const ci::Rectf&				getBounds() const;
+	/*! Returns 3D TriMesh of face in world space. FaceTracker must 
+		have mesh calculation enabled. */
+	const ci::TriMeshRef&				getMesh() const;
+	/*! Returns 2D TriMesh of face. Coordinates are projected into color image.
+		FaceTracker must have 2D mesh calculation enabled. */
+	const ci::TriMeshRef&				getMesh2d() const;
+	//! Returns transform matrix of face's pose.
+	const ci::Matrix44f&				getPoseMatrix() const;
+	//! Returns ID provided in FaceTracker::findFaces().
+	size_t								getUserId() const;
+protected:
+	AnimationUnitMap					mAnimationUnits;
+	ci::Rectf							mBounds;
+	ci::TriMeshRef						mMesh;
+	ci::TriMeshRef						mMesh2d;
+	ci::Matrix44f						mPoseMatrix;
+	size_t								mUserId;
+
+	friend class						FaceTracker;
+};
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+
+//! Microsoft FaceTracking API wrapper for use with the Kinect.
+class FaceTracker
+{
+protected:
+	typedef std::shared_ptr<std::thread> ThreadRef;
+public:
+	/*! Creates pointer to instance of FaceTracker. Tracks one face at a 
+		time. For multiple faces, create multiple FaceTracker instances 
+		and use hinting (pass head and neck points of skeleton) when 
+		finding faces. */
+	static FaceTrackerRef				create();
+	~FaceTracker();
+
+	//! Returns pointer to native IFTFaceTracker.
+	IFTFaceTracker*						getFaceTracker() const;
+	//! Returns pointer to native IFTModel.
+	IFTModel*							getModel() const;
+	//! Returns pointer to native IFTResult.
+	IFTResult*							getResult() const;
+
+	/*! Enables 3D mesh calculation. Face will be returned with 
+		empty TriMesh if disabled. */
+	void								enableCalcMesh( bool enabled = true );
+	/*! Enables 2D mesh calculation. Face will be returned with 
+		empty TriMesh2d if disabled. TriMesh2d coordinates are 
+		projected into color image. */
+	void								enableCalcMesh2d( bool enabled = true );
+	//! Returns true if 3D mesh calculation is enabled.
+	bool								isCalcMeshEnabled() const;
+	//! Returns true if 2D mesh calculation is enabled.
+	bool								isCalcMesh2dEnabled() const;
+
+	//! Returns true if face tracker is running.
+	bool								isTracking() const;
+
+	//! Start face tracking, allocating buffers based on \a deviceOptions.
+	virtual void						start( const DeviceOptions& deviceOptions = DeviceOptions() );
+	//! Stop face tracking
+	virtual void						stop();
+	
+	/*! Update \a color and \a depth images from Kinect. Pass head and 
+		neck points together, in order, through \a headPoints to target a user. 
+		The value passed to \a userId will be returned from Face::getUserId() in 
+		the event handler's face argument. */
+	virtual void						update( const ci::Surface8u& color, const ci::Channel16u& depth, 
+		const ci::Vec3f headPoints[ 2 ] = 0, size_t userId = 0 );
+	
+	//! Set event handler to method with signature void( FaceTracker::Face ).
+	template<typename T, typename Y> 
+	inline void							connectEventHander( T eventHandler, Y* obj )
+	{
+		connectEventHander( std::bind( eventHandler, obj, std::placeholders::_1 ) );
+	}
+
+	//! Set event handler to method with signature void( FaceTracker::Face ).
+	void								connectEventHander( const std::function<void( Face )>& eventHandler );
+protected:
+	FaceTracker();
+
+	std::function<void( Face )>			mEventHandler;
+	std::mutex							mMutex;
+	volatile bool						mNewFace;
+	volatile bool						mRunning;
+	ThreadRef							mThread;
+	virtual void						run();
+
+	bool								mCalcMesh;
+	bool								mCalcMesh2d;
+	ci::Channel16u						mChannelDepth;
+	FT_CAMERA_CONFIG					mConfigColor;
+	FT_CAMERA_CONFIG					mConfigDepth;
+	Face								mFace;
+	IFTFaceTracker*						mFaceTracker;
+	std::vector<ci::Vec3f>				mHeadPoints;
+	KCBHANDLE							mKinect;
+	IFTModel*							mModel;
+	IFTResult*							mResult;
+	FT_SENSOR_DATA						mSensorData;
+	bool								mSuccess;
+	ci::Surface8u						mSurfaceColor;
+	size_t								mUserId;
+public:
+
+	//////////////////////////////////////////////////////////////////////////////////////////////
+
+	class Exception : public cinder::Exception
+	{
+	public:
+		const char* what() const throw();
+	protected:
+		char							mMessage[ 2048 ];
+		friend class					FaceTracker;
+	};
+
+	//! Exception representing failure to create FaceTracker.
+	class ExcFaceTrackerCreate : public Exception 
+	{
+	public:
+		ExcFaceTrackerCreate() throw();
+	};
+
+	//! Exception representing failure to create image buffer.
+	class ExcFaceTrackerCreateImage : public Exception 
+	{
+	public:
+		ExcFaceTrackerCreateImage( long hr ) throw();
+	};
+	
+	//! Exception representing failure to create FaceTracker result.
+	class ExcFaceTrackerCreateResult : public Exception 
+	{
+	public:
+		  ExcFaceTrackerCreateResult( long hr ) throw();
+	};
+
+	//! Exception representing failure to initialize FaceTracker.
+	class ExcFaceTrackerInit : public Exception 
+	{
+	public:
+		ExcFaceTrackerInit( long hr ) throw();
+	};
+};
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+
 /*! Class representing Kinect frame data. A frame only contains data 
 	for enabled features (e.g., skeletons are empty if skeleton tracking 
 	is disabled). */
@@ -275,6 +441,8 @@ public:
 	const ci::Channel16u&				getDepthChannel() const;
 	//! Returns unique identifier for the sensor that generated the frame.
 	const std::string&					getDeviceId() const;
+	//! Returns face if tracking is enabled.
+	const Face&							getFace() const;
 	//! Returns unique, sequential frame ID.
 	long long							getFrameId() const;
 	//! Returns infrared channel for this frame.
@@ -284,12 +452,13 @@ public:
 protected:
 	Frame( long long frameId, const std::string& deviceId, const ci::Surface8u& color, 
 		const ci::Channel16u& depth, const ci::Channel16u& infrared, 
-		const std::vector<Skeleton>& skeletons );
+		const std::vector<Skeleton>& skeletons, const Face& face );
 
 	ci::Surface8u						mColorSurface;
 	ci::Channel16u						mDepthChannel;
 	ci::Channel16u						mInfraredChannel;
 	std::string							mDeviceId;
+	MsKinect::Face						mFace;
 	long long							mFrameId;
 	std::vector<Skeleton>				mSkeletons;
 
@@ -324,6 +493,10 @@ public:
 	INuiCoordinateMapper*				getCoordinateMapper() const;
 	//! Returns options object for this device.
 	const DeviceOptions&				getDeviceOptions() const;
+	//! Returns the face tracker for this device.
+	FaceTrackerRef&						getFaceTracker();
+	//! Returns the face tracker for this device.
+	const FaceTrackerRef&				getFaceTracker() const;
 	//! Returns accelerometer reading.
 	ci::Quatf							getOrientation() const;
 	//! Returns current device angle in degrees between -28 and 28.
@@ -381,6 +554,9 @@ protected:
 	std::vector<Skeleton>				mSkeletons;
 	ci::Surface8u						mSurfaceColor;
 	
+	MsKinect::Face						mFace;
+	MsKinect::FaceTrackerRef			mFaceTracker;
+
 	bool								mCapture;
 	bool								mIsSkeletonDevice;
 	bool								mVerbose;
@@ -475,5 +651,27 @@ public:
 		ExcUserTrackingEnable( long hr, const std::string& id ) throw();
 	};
 };
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+
+//! Counts the number of users in \a depth.
+size_t									calcNumUsersFromDepth( const ci::Channel16u& depth );
+/*! Calculates confidence of \a skeleton between 0.0 and 1.0. Joints 
+	are weighted by distance to torso when \a weighted is true. */
+float									calcSkeletonConfidence( const Skeleton& skeleton, bool weighted = false );
+//! Shifts 16-bit depth data to make it visible.
+ci::Channel8u							channel16To8( const ci::Channel16u& channel );
+//! Creates a surface with colorized users from \a depth.
+ci::Surface16u							depthChannelToSurface( const ci::Channel16u& depth, 
+															  const DepthProcessOptions& depthProcessOptions = DepthProcessOptions() );
+//! Returns depth value as 0.0 - 1.0 float for pixel at \a pos.
+float									getDepthAtCoord( const ci::Channel16u& depth, const ci::Vec2i& v );
+//! Returns number of Kinect devices.
+size_t									getDeviceCount();
+//! Returns use color for user ID \a id.
+ci::Colorf								getUserColor( uint32_t id );
+//! Returns user ID for pixel at \a coord in \a depth. 0 is no user.
+uint16_t								userIdFromDepthCoord( const ci::Channel16u& depth, const ci::Vec2i& v );
+
 }
  
