@@ -227,7 +227,6 @@ xcopy "$(KINECT_TOOLKIT_DIR)Redist\amd64\Face*.*" "$(OutDir)" /Y /C</Command>
     </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\src\FaceTracker.cpp" />
     <ClCompile Include="..\..\..\src\Kinect.cpp" />
     <ClCompile Include="..\src\UserApp.cpp" />
   </ItemGroup>
@@ -239,7 +238,6 @@ xcopy "$(KINECT_TOOLKIT_DIR)Redist\amd64\Face*.*" "$(OutDir)" /Y /C</Command>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\lib\KinectCommonBridgeLib.h" />
-    <ClInclude Include="..\..\..\src\FaceTracker.h" />
     <ClInclude Include="..\..\..\src\Kinect.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

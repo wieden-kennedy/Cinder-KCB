@@ -29,9 +29,6 @@
     <ClCompile Include="..\..\..\src\Kinect.cpp">
       <Filter>blocks\Cinder-KCB</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\FaceTracker.cpp">
-      <Filter>blocks\Cinder-KCB</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Image Include="cinder_app_icon.ico">
@@ -45,9 +42,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\Kinect.h">
-      <Filter>blocks\Cinder-KCB</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\FaceTracker.h">
       <Filter>blocks\Cinder-KCB</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\lib\KinectCommonBridgeLib.h">
