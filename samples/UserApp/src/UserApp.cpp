@@ -35,11 +35,8 @@
 */
 
 #include "cinder/app/AppBasic.h"
-#include "cinder/app/RendererGl.h"
-#include "cinder/gl/Context.h"
 #include "cinder/gl/Texture.h"
 #include "cinder/params/Params.h"
-#include "FaceTracker.h"
 #include "Kinect.h"
 
 class UserApp : public ci::app::AppBasic 
@@ -52,7 +49,7 @@ private:
 	MsKinect::DeviceRef			mDevice;
 	MsKinect::Frame				mFrame;
 	
-	MsKinect::FaceTracker::Face	mFace;
+	MsKinect::Face				mFace;
 	MsKinect::FaceTrackerRef	mFaceTracker;
 };
 
@@ -62,7 +59,7 @@ using namespace std;
 
 void UserApp::draw()
 {
-	gl::viewport( getWindowSize() );
+	gl::setViewport( getWindowBounds() );
 	gl::clear();
 	gl::setMatricesWindow( getWindowSize() );
 	gl::enableAlphaBlending();
@@ -88,12 +85,12 @@ void UserApp::draw()
 			}
 		}
 
-		if ( mFace.getMesh2d()->getNumVertices() > 0 ) {
+		if ( mFace.getMesh2d().getNumVertices() > 0 ) {
 			gl::pushMatrices();
 			gl::scale( 0.5f, 0.5f );
 			gl::color( ColorAf::white() );
 			gl::enableWireframe();
-			gl::draw( *mFace.getMesh2d() );
+			gl::draw( mFace.getMesh2d() );
 			gl::disableWireframe();
 			gl::popMatrices();
 		}
@@ -122,13 +119,13 @@ void UserApp::setup()
 	mDevice = MsKinect::Device::create();
 	mDevice->connectEventHandler( [ & ]( MsKinect::Frame frame )
 	{
-		mFrame = frame;
-		if ( mFaceTracker ) {
-			mFaceTracker->update( mFrame.getColorSurface(), mFrame.getDepthChannel() );
-		}
+		mFrame  = frame;
+		mFace	= frame.getFace();
 	} );
 	try {
-		mDevice->start();
+		mDevice->start( MsKinect::DeviceOptions().enableFaceTracking() );
+		mDevice->getFaceTracker()->enableCalcMesh( false );
+		mDevice->getFaceTracker()->enableCalcMesh2d();
 	} catch ( MsKinect::Device::ExcDeviceCreate ex ) {
 		console() << ex.what() << endl;
 	} catch ( MsKinect::Device::ExcDeviceInit ex ) {
@@ -146,14 +143,6 @@ void UserApp::setup()
 	} catch ( MsKinect::Device::ExcUserTrackingEnable ex ) {
 		console() << ex.what() << endl;
 	}
-	
-	mFaceTracker = MsKinect::FaceTracker::create();
-	mFaceTracker->enableCalcMesh( false );
-	mFaceTracker->enableCalcMesh2d();
-	mFaceTracker->connectEventHander( [ & ]( MsKinect::FaceTracker::Face face ) {
-		mFace = face;
-	} );
-	mFaceTracker->start();
 }
 
 CINDER_APP_BASIC( UserApp, RendererGl )

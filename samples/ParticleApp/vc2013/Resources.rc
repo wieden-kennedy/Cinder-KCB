@@ -1,9 +1,0 @@
-#include "Resources.h"
-
-ID ICON "../resources/cinder_app_icon.ico"
-
-RES_GLSL_DRAW_FRAG
-RES_GLSL_DRAW_VERT
-RES_GLSL_GPGPU_FRAG
-RES_GLSL_GPGPU_VERT
- 

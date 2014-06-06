@@ -1,10 +1,6 @@
-#version 330 core
-
-in vec4		vColor;
-
-out vec4	oColor;
+varying vec4 vColor;
 
 void main( void )
 {
-	oColor = vColor;
+	gl_FragColor = vColor;
 }

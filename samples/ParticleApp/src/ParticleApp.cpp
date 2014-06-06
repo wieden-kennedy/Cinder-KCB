@@ -35,13 +35,11 @@
 */
 
 #include "cinder/app/AppBasic.h"
-#include "cinder/app/RendererGl.h"
 #include "cinder/Camera.h"
-#include "cinder/gl/Context.h"
 #include "cinder/gl/Fbo.h"
 #include "cinder/gl/GlslProg.h"
 #include "cinder/gl/Texture.h"
-#include "cinder/gl/VboMesh.h"
+#include "cinder/gl/Vbo.h"
 #include "cinder/params/Params.h"
 #include "Kinect.h"
 
@@ -57,13 +55,11 @@ private:
 	MsKinect::DeviceRef			mDevice;
 	void						onFrame( MsKinect::Frame frame );
 
-	ci::gl::FboRef				mFbo[ 2 ];
-	ci::gl::GlslProgRef			mGlslProgDraw;
-	ci::gl::GlslProgRef			mGlslProgGpGpu;
+	ci::gl::Fbo					mFbo[ 2 ];
+	ci::gl::GlslProgRef			mShaderDraw;
+	ci::gl::GlslProgRef			mShaderGpGpu;
 	ci::gl::VboMeshRef			mMesh;
 	ci::gl::TextureRef			mTextureDepth;
-	ci::gl::TextureRef			mTexturePosition[ 2 ];
-	ci::gl::TextureRef			mTextureVelocity[ 2 ];
 	
 	ci::CameraPersp				mCamera;
 	ci::Vec3f					mEyePoint;
@@ -103,40 +99,39 @@ void ParticleApp::draw()
 		int32_t ping = getElapsedFrames() % 2;
 		int32_t pong = ( ping + 1 ) % 2;
 		{
-			gl::context()->pushFramebuffer( mFbo[ pong ] );
+			mFbo[ pong ].bindFramebuffer();
 			const GLenum buffers[ 2 ] = {
 				GL_COLOR_ATTACHMENT0, 
 				GL_COLOR_ATTACHMENT1
 			};
 			glDrawBuffers( 2, buffers );
-			gl::viewport( mFbo[ pong ]->getSize() );
-			gl::setMatricesWindow( mFbo[ pong ]->getSize(), false );
-			mTextureDepth->bind( 0 );
-			mTexturePosition[ ping ]->bind( 1 );
-			mTextureVelocity[ ping ]->bind( 2 );
+			gl::setViewport( mFbo[ pong ].getBounds() );
+			gl::setMatricesWindow( mFbo[ pong ].getSize(), false );
+			for ( int32_t i = 0; i < 2; ++i ) {
+				mFbo[ ping ].bindTexture( i, i );
+			}
+			mTextureDepth->bind( 2 );
 			
-			gl::context()->pushGlslProg( mGlslProgGpGpu );
-			gl::context()->setDefaultShaderVars();
-			mGlslProgGpGpu->uniform( "uCenter",				mParticleCenter );
-			mGlslProgGpGpu->uniform( "uDampen",				mParticleDampen );
-			mGlslProgGpGpu->uniform( "uSpeed",				mParticleSpeed );
-			mGlslProgGpGpu->uniform( "uTextureKinect",		0 );
-			mGlslProgGpGpu->uniform( "uTexturePosition",	1 );
-			mGlslProgGpGpu->uniform( "uTextureVelocity",	2 );
+			mShaderGpGpu->bind();
+			mShaderGpGpu->uniform( "uCenter",			mParticleCenter );
+			mShaderGpGpu->uniform( "uDampen",			mParticleDampen );
+			mShaderGpGpu->uniform( "uSpeed",			mParticleSpeed );
+			mShaderGpGpu->uniform( "uTextureKinect",	2 );
+			mShaderGpGpu->uniform( "uTexturePosition",	0 );
+			mShaderGpGpu->uniform( "uTextureVelocity",	1 );
 		
-			gl::drawSolidRect( mFbo[ pong ]->getBounds() );
+			gl::drawSolidRect( mFbo[ pong ].getBounds(), false );
 			
-			gl::context()->popGlslProg();
-			mTextureVelocity[ ping ]->unbind();
-			mTexturePosition[ ping ]->unbind();
+			mShaderGpGpu->unbind();
 			mTextureDepth->unbind();
-			gl::context()->popFramebuffer();
+			mFbo[ ping ].unbindTexture();
+			mFbo[ pong ].unbindFramebuffer();
 		}
 
 		////////////////////////////////////////////////////////////////
 		// Draw particles
 
-		gl::viewport( getWindowSize() );
+		gl::setViewport( getWindowBounds() );
 		{
 			gl::setMatricesWindow( getWindowSize() );
 			gl::enableAlphaBlending();
@@ -150,18 +145,17 @@ void ParticleApp::draw()
 			gl::enable( GL_TEXTURE_2D );
 			gl::color( ColorAf::white() );
 
-			mTexturePosition[ pong ]->bind();
+			mFbo[ pong ].bindTexture();
 
-			gl::context()->pushGlslProg( mGlslProgDraw );
-			gl::context()->setDefaultShaderVars();
-			mGlslProgDraw->uniform( "uDepth",			mPointCloudDepth );
-			mGlslProgDraw->uniform( "uTexturePosition",	0 );
-			mGlslProgDraw->uniform( "uTime",			(float)getElapsedSeconds() );
+			mShaderDraw->bind();
+			mShaderDraw->uniform( "uDepth",		mPointCloudDepth );
+			mShaderDraw->uniform( "uPositions",	0 );
+			mShaderDraw->uniform( "uTime",		(float)getElapsedSeconds() );
 
 			gl::draw( mMesh );
 
-			gl::context()->popGlslProg();
-			mTexturePosition[ pong ]->unbind();
+			mShaderDraw->unbind();
+			mFbo[ pong ].unbindTexture();
 			gl::disableAlphaBlending();
 		}
 
@@ -181,16 +175,14 @@ void ParticleApp::draw()
 			gl::popMatrices();
 			y += (float)( mTextureDepth->getHeight() / 2 );
 
-			gl::pushMatrices();
-			gl::translate( x, y );
-			gl::draw( mTexturePosition[ 0 ], mTexturePosition[ 0 ]->getBounds(), Rectf( mTexturePosition[ 0 ]->getBounds() ) * 0.5f );
-			gl::popMatrices();
-			y += (float)( mTexturePosition[ 0 ]->getHeight() / 2 );
-
-			gl::pushMatrices();
-			gl::translate( x, y );
-			gl::draw( mTextureVelocity[ 0 ], mTextureVelocity[ 0 ]->getBounds(), Rectf( mTextureVelocity[ 0 ]->getBounds() ) * 0.5f );
-			gl::popMatrices();
+			for ( int32_t i = 0; i < 2; ++i ) {
+				gl::pushMatrices();
+				gl::translate( x, y );
+				const gl::Texture& tex = mFbo[ 0 ].getTexture( i );
+				gl::draw( tex, tex.getBounds(), Rectf( tex.getBounds() ) * 0.5f );
+				gl::popMatrices();
+				y += (float)( tex.getHeight() / 2 );
+			}
 		}
 	}
 	
@@ -216,6 +208,9 @@ void ParticleApp::prepareSettings( Settings* settings )
 void ParticleApp::resize()
 {
 	glPointSize( 0.25f );
+	gl::enable( GL_POINT_SMOOTH );
+	glHint( GL_POINT_SMOOTH_HINT, GL_NICEST );
+
 	mCamera = CameraPersp( getWindowWidth(), getWindowHeight(), 60.0f, 1.0f, 50000.0f );
 	mCamera.setWorldUp( -Vec3f::yAxis() );
 }
@@ -226,7 +221,7 @@ void ParticleApp::setup()
 	// Load shaders
 
 	try {
-		mGlslProgDraw = gl::GlslProg::create( loadResource( RES_GLSL_DRAW_VERT ), loadResource( RES_GLSL_DRAW_FRAG ) );
+		mShaderDraw = gl::GlslProg::create( loadResource( RES_GLSL_DRAW_VERT ), loadResource( RES_GLSL_DRAW_FRAG ) );
 	} catch ( gl::GlslProgCompileExc ex ) {
 		console() << "Unable to load draw shader: " << ex.what() << endl;
 		quit();
@@ -234,7 +229,7 @@ void ParticleApp::setup()
 	}
 
 	try {
-		mGlslProgGpGpu = gl::GlslProg::create( loadResource( RES_GLSL_GPGPU_VERT ), loadResource( RES_GLSL_GPGPU_FRAG ) );
+		mShaderGpGpu = gl::GlslProg::create( loadResource( RES_GLSL_GPGPU_VERT ), loadResource( RES_GLSL_GPGPU_FRAG ) );
 	} catch ( gl::GlslProgCompileExc ex ) {
 		console() << "Unable to load GPGPU shader: " << ex.what() << endl;
 		quit();
@@ -257,7 +252,7 @@ void ParticleApp::setup()
 	mPointCloudDepth	= 3000.0f;
 
 	////////////////////////////////////////////////////////////////
-	// Kinect
+	// Set up Kinect
 
 	MsKinect::DeviceOptions deviceOptions;
 	deviceOptions.enableColor( false );
@@ -286,89 +281,70 @@ void ParticleApp::setup()
 	}
 
 	////////////////////////////////////////////////////////////////
-	// Point cloud vertex buffer
-
-	int32_t h = deviceOptions.getDepthSize().y;
-	int32_t w = deviceOptions.getDepthSize().x;
+	// Set up particles
 
 	glPointSize( 1.0f );
-	
-	struct Vertex
-	{
-		Vec3f position;
-		Vec2f texCoord;
-	};
-	vector<Vertex> vertices;
+
+	gl::Fbo::Format format;
+	format.enableColorBuffer( true, 4 );
+	format.setColorInternalFormat( GL_RGBA32F );
+
+	for ( size_t i = 0; i < 2; ++i ) {
+		mFbo[ i ] = gl::Fbo( deviceOptions.getDepthSize().x, deviceOptions.getDepthSize().y, format );
+		mFbo[ i ].bindFramebuffer();
+		const GLenum buffers[ 2 ] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+		glDrawBuffers( 2, buffers );
+		gl::setViewport( mFbo[ i ].getBounds() );
+		gl::setMatricesWindow( mFbo[ i ].getSize() );
+		gl::clear();
+		mFbo[ i ].unbindFramebuffer();
+	}
+
 	vector<uint32_t> indices;
+	vector<Vec3f> positions;
+	vector<Vec2f> texCoords;
+	int32_t h	= mFbo[ 0 ].getHeight();
+	int32_t w	= mFbo[ 0 ].getWidth();
 	for ( int32_t x = 0; x < w; ++x ) {
 		for ( int32_t y = 0; y < h; ++y ) {
 			indices.push_back( (uint32_t)( x * h + y ) );
-			Vertex vertex;
-			vertex.texCoord = Vec2f( (float)x / (float)( w - 1 ), (float)y / (float)( h - 1 ) );
-			vertex.position = Vec3f(
-				( vertex.texCoord.x * 2.0f - 1.0f ) * (float)h, 
-				( vertex.texCoord.y * 2.0f - 1.0f ) * (float)w, 
-				0.0f );
-			vertices.push_back( vertex );
+			texCoords.push_back( Vec2f( (float)x / (float)( w - 1 ), (float)y / (float)( h - 1 ) ) );
+			positions.push_back( Vec3f(
+				( texCoords.rbegin()->x * 2.0f - 1.0f ) * (float)h, 
+				( texCoords.rbegin()->y * 2.0f - 1.0f ) * (float)w, 
+				0.0f ) );
 		}
 	}
+	gl::VboMesh::Layout layout;
+	layout.setStaticIndices();
+	layout.setStaticPositions();
+	layout.setStaticTexCoords2d();
 
-	gl::VboRef vboIndices	= gl::Vbo::create( GL_ELEMENT_ARRAY_BUFFER, sizeof( uint32_t )	* indices.size(),	&indices[ 0 ] );
-	gl::VboRef vboVertices	= gl::Vbo::create( GL_ARRAY_BUFFER,			sizeof( Vertex )	* vertices.size(),	&vertices[ 0 ] );
-	geom::BufferLayout layout;
-	layout.append( geom::Attrib::POSITION,		3, sizeof( Vertex ), 0 );
-	layout.append( geom::Attrib::TEX_COORD_0,	2, sizeof( Vertex ), sizeof( Vec3f ) );
-	vector<pair<geom::BufferLayout, gl::VboRef> > buffer;
-	buffer.push_back( make_pair( layout, vboVertices ) );
-	mMesh = gl::VboMesh::create( vertices.size(), GL_POINTS, buffer, indices.size(), GL_UNSIGNED_BYTE, vboIndices );
-
-	////////////////////////////////////////////////////////////////
-	// Position and velocity buffer
-
-	gl::Texture2d::Format textureFormat;
-	textureFormat.setInternalFormat( GL_RGBA32F );
-	textureFormat.setMagFilter( GL_NEAREST );
-	textureFormat.setMinFilter( GL_NEAREST );
-	textureFormat.setWrap( GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE );
-	textureFormat.setPixelDataFormat( GL_RGBA );
-	textureFormat.setPixelDataType( GL_FLOAT );
-
-	for ( size_t i = 0; i < 2; ++i ) {
-		mTexturePosition[ i ] = gl::Texture2d::create( w, h, textureFormat );
-		mTextureVelocity[ i ] = gl::Texture2d::create( w, h, textureFormat );
-
-		gl::RenderbufferRef positionBuffer = gl::Renderbuffer::create( w, h, 0, 0 );
-		gl::RenderbufferRef velocityBuffer = gl::Renderbuffer::create( w, h, 0, 0 );
-
-		gl::Fbo::Format fboFormat;
-		fboFormat.attachment( GL_COLOR_ATTACHMENT0, mTexturePosition[ i ], positionBuffer );
-		fboFormat.attachment( GL_COLOR_ATTACHMENT1, mTextureVelocity[ i ], velocityBuffer );
-		mFbo[ i ] = gl::Fbo::create( w, h, fboFormat );
-
-		gl::ScopedFramebuffer fboScope( mFbo[ i ] );
-		gl::viewport( mFbo[ i ]->getSize() );
-		gl::clear();
-	}
+	mMesh = gl::VboMesh::create( positions.size(), indices.size(), layout, GL_POINTS );
+	mMesh->bufferIndices( indices );
+	mMesh->bufferPositions( positions );
+	mMesh->bufferTexCoords2d( 0, texCoords );
+	mMesh->unbindBuffers();
 
 	////////////////////////////////////////////////////////////////
 	// Set up parameters
 
 	mParams = params::InterfaceGl::create( "PARAMS", Vec2i( 200, 400 ) );
-	mParams->addParam( "Frame rate",		&mFrameRate,			"", true );
-	mParams->addParam( "Full screen",		&mFullScreen,			"key=f" );
-	mParams->addButton( "Quit",				[ & ]() { quit(); },	"key=q" );
+	mParams->addParam( "Frame rate",		&mFrameRate,						"", true );
+	mParams->addParam( "Full screen",		&mFullScreen,						"key=f" );
+	mParams->addButton( "Quit",				bind( &ParticleApp::quit, this ),	"key=q" );
 	mParams->addSeparator( "" );
 	mParams->addParam( "Eye point",			&mEyePoint );
 	mParams->addParam( "Look at",			&mLookAt );
-	mParams->addParam( "Point cloud depth",	&mPointCloudDepth,		"min=-10000.0 max=10000.0 step=1.0" );
+	mParams->addParam( "Point cloud depth",	&mPointCloudDepth,					"min=-10000.0 max=10000.0 step=1.0" );
 	mParams->addSeparator( "" );
-	mParams->addParam( "Particle dampen",	&mParticleDampen,		"min=0.0 max=1.0 step=0.0001" );
+	mParams->addParam( "Particle dampen",	&mParticleDampen,					"min=0.0 max=1.0 step=0.0001" );
 	mParams->addParam( "Particle origin",	&mParticleCenter );
-	mParams->addParam( "Particle speed",	&mParticleSpeed,		"min=-10.0 max=10.0 step=0.001" );
-	mParams->addParam( "Particle trails",	&mParticleTrails,		"min=0.0 max=1.0 step=0.000001" );
+	mParams->addParam( "Particle speed",	&mParticleSpeed,					"min=-10.0 max=10.0 step=0.001" );
+	mParams->addParam( "Particle trails",	&mParticleTrails,					"min=0.0 max=1.0 step=0.000001" );
 	mParams->addSeparator( "" );
-	mParams->addParam( "Draw params",		&mDrawParams,			"key=p" );
-	mParams->addParam( "Draw textures",		&mDrawTextures,			"key=t" );
+	mParams->addParam( "Draw params",		&mDrawParams,						"key=p" );
+	mParams->addParam( "Draw textures",		&mDrawTextures,						"key=t" );
 	
 	resize();
 }
@@ -384,5 +360,5 @@ void ParticleApp::update()
 	}
 }
 
-CINDER_APP_BASIC( ParticleApp, RendererGl( RendererGl::Options().antiAliasing( RendererGl::AA_NONE ).coreProfile().version( 3, 3 ) ) )
+CINDER_APP_BASIC( ParticleApp, RendererGl )
  
