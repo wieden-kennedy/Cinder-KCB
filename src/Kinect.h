@@ -443,8 +443,8 @@ public:
 	const std::string&					getDeviceId() const;
 	//! Returns face if tracking is enabled.
 	const Face&							getFace() const;
-	//! Returns matrix representing floor clip plane when skeleton is present.
-	const ci::Matrix44f&				getFloorClipPlane() const;
+	//! Returns Vec4f representing floor clip plane when skeleton is present.
+	const ci::Vec4f&					getFloorClipPlane() const;
 	//! Returns unique, sequential frame ID.
 	long long							getFrameId() const;
 	//! Returns infrared channel for this frame.
@@ -457,13 +457,13 @@ protected:
 	Frame( long long frameId, const std::string& deviceId, const ci::Surface8u& color, 
 		const ci::Channel16u& depth, const ci::Channel16u& infrared, 
 		const std::vector<Skeleton>& skeletons, const Face& face, 
-		const ci::Matrix44f& floorClipPlane, const ci::Vec3f& normalToGravity );
+		const ci::Vec4f& floorClipPlane, const ci::Vec3f& normalToGravity );
 
 	ci::Surface8u						mColorSurface;
 	ci::Channel16u						mDepthChannel;
 	std::string							mDeviceId;
 	MsKinect::Face						mFace;
-	ci::Matrix44f						mFloorClipPlane;
+	ci::Vec4f							mFloorClipPlane;
 	long long							mFrameId;
 	ci::Channel16u						mInfraredChannel;
 	ci::Vec3f							mNormalToGravity;
