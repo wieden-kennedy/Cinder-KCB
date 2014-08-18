@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<cinder>
+<block
+	name="Kinect Common Bridge"
+	id="com.wk.kcb"
+	author="Bruce Lane"
+	license="BSD"
+	summary="Kinect Common Bridge block for Cinder"
+	url="https://github.com/wieden-kennedy/Cinder-KCB"
+	git="git://github.com/wieden-kennedy/Cinder-KCB.git"
+	>
+	<supports os="msw" />
+	<includePath>include</includePath>
+	<includePath>src</includePath>
+	<includePath absolute="true">$(KINECTSDK10_DIR)/inc</includePath>
+	<includePath absolute="true">$(KINECT_TOOLKIT_DIR)inc</includePath>
+	<headerPattern>src/*.h</headerPattern>
+	<sourcePattern>src/*.cpp</sourcePattern>
+	<staticLibrary>lib/x86/lib/Release/v120/KinectCommonBridge.lib</staticLibrary>
+	<staticLibrary absolute="true">$(KINECTSDK10_DIR)/lib/x86/Kinect10.lib</staticLibrary>
+	<staticLibrary absolute="true">$(KINECT_TOOLKIT_DIR)Lib/x86/FaceTrackLib.lib</staticLibrary>
+	<buildCopy>lib/x86/dll/Release/KinectCommonBridge.dll</buildCopy>
+	<buildCopy absolute="true">$(KINECT_TOOLKIT_DIR)Redist/x86/FaceTrackLib.dll</buildCopy>
+</block>
+<template>templates/KCB/template.xml</template>
+</cinder>
