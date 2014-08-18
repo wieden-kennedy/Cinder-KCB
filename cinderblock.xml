@@ -21,6 +21,7 @@
 	<staticLibrary absolute="true">$(KINECT_TOOLKIT_DIR)Lib/x86/FaceTrackLib.lib</staticLibrary>
 	<buildCopy>lib/x86/dll/Release/KinectCommonBridge.dll</buildCopy>
 	<buildCopy absolute="true">$(KINECT_TOOLKIT_DIR)Redist/x86/FaceTrackLib.dll</buildCopy>
+	<buildCopy absolute="true">$(KINECT_TOOLKIT_DIR)Redist/x86/FaceTrackData.dll</buildCopy>
 </block>
 <template>templates/KCB/template.xml</template>
 </cinder>
