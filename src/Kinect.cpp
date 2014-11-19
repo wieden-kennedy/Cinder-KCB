@@ -1311,7 +1311,7 @@ void Device::start( const DeviceOptions& deviceOptions )
 			_bstr_t id = deviceId.c_str();
 			hr = NuiCreateSensorById( id, &mNuiSensor );
 			for ( size_t i = 0; i < count; ++i ) {
-				if ( deviceId == wcharToString( portId ) && KinectGetPortIDByIndex( i, _countof( portId ), portId ) ) {
+				if ( KinectGetPortIDByIndex(i, _countof(portId), portId) && deviceId == wcharToString(portId) ) {
 					mDeviceOptions.mDeviceHandle	= KinectOpenSensor( portId );
 					hr		= NuiCreateSensorById( portId, &mNuiSensor );
 					mDeviceOptions.setDeviceIndex( i );
