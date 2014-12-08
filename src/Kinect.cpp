@@ -90,12 +90,12 @@ const Rectf& Face::getBounds() const
 	return mBounds;
 }
 
-const TriMesh& Face::getMesh() const
+const TriMeshRef& Face::getMesh() const
 {
 	return mMesh;
 }
 
-const TriMesh2d& Face::getMesh2d() const
+const TriMeshRef& Face::getMesh2d() const
 {
 	return mMesh2d;
 }
@@ -302,8 +302,8 @@ void FaceTracker::run()
 
 			Face face;
 			face.mBounds	= Rectf( 0.0f, 0.0f, 0.0f, 0.0f );
-			face.mMesh.clear();
-			face.mMesh2d.clear();
+			face.mMesh		= TriMesh::create( TriMesh::Format().positions() );
+			face.mMesh2d	= TriMesh::create( TriMesh::Format().positions() );
 			face.mUserId	= mUserId;
 			face.mPoseMatrix.setToIdentity();
 
@@ -370,7 +370,7 @@ void FaceTracker::run()
 							if ( SUCCEEDED( hr ) ) {
 								for ( size_t i = 0; i < numVertices; ++i ) {
 									Vec3f v( pts[ i ].x, pts[ i ].y, pts[ i ].z );
-									face.mMesh.appendVertex( v );
+									face.mMesh->appendVertex( v );
 								}
 
 								FT_TRIANGLE* triangles	= 0;
@@ -378,7 +378,7 @@ void FaceTracker::run()
 								hr = mModel->GetTriangles( &triangles, &triangleCount );
 								if ( SUCCEEDED( hr ) ) {
 									for ( size_t i = 0; i < triangleCount; ++i ) {
-										face.mMesh.appendTriangle( triangles[ i ].i, triangles[ i ].j, triangles[ i ].k );
+										face.mMesh->appendTriangle( triangles[ i ].i, triangles[ i ].j, triangles[ i ].k );
 									}
 								}
 							}
@@ -394,7 +394,7 @@ void FaceTracker::run()
 							if ( SUCCEEDED( hr ) ) {
 								for ( size_t i = 0; i < numVertices; ++i ) {
 									Vec2f v( pts[ i ].x + 0.5f, pts[ i ].y + 0.5f );
-									face.mMesh2d.appendVertex( v );
+									face.mMesh2d->appendVertex( Vec3f( v.x, v.y, 0.0f ) );
 								}
 
 								FT_TRIANGLE* triangles	= 0;
@@ -402,7 +402,7 @@ void FaceTracker::run()
 								hr = mModel->GetTriangles( &triangles, &triangleCount );
 								if ( SUCCEEDED( hr ) ) {
 									for ( size_t i = 0; i < triangleCount; ++i ) {
-										face.mMesh2d.appendTriangle( triangles[ i ].i, triangles[ i ].j, triangles[ i ].k );
+										face.mMesh2d->appendTriangle( triangles[ i ].i, triangles[ i ].j, triangles[ i ].k );
 									}
 								}
 							}

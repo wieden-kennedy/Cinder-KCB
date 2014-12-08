@@ -35,6 +35,7 @@
 */
 
 #include "cinder/app/AppBasic.h"
+#include "cinder/app/RendererGl.h"
 #include "cinder/gl/Texture.h"
 #include "Kinect.h"
 
@@ -56,7 +57,7 @@ using namespace std;
 
 void BasicApp::draw()
 {
-	gl::setViewport( getWindowBounds() );
+	gl::viewport( getWindowSize() );
 	gl::clear();
 	gl::setMatricesWindow( getWindowSize() );
 	
