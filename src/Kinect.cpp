@@ -67,6 +67,11 @@ Vec3f toVec3f( const Vector4& v )
 	return Vec3f( v.x, v.y, v.z );
 }
 
+Vec4f toVec4f( const Vector4& v ) 
+{
+	return Vec4f( v.x, v.y, v.z, v.w );
+}
+
 //////////////////////////////////////////////////////////////////////////////////////////////
 
 Face::Face()
@@ -981,15 +986,16 @@ DeviceOptions& DeviceOptions::setSkeletonTransform( SkeletonTransform transform 
 //////////////////////////////////////////////////////////////////////////////////////////////
 
 Frame::Frame()
-	: mDeviceId( "" ), mFrameId( 0 )
+	: mDeviceId( "" ), mFloorClipPlane( Vec4f::zero() ), mFrameId( 0 ), mNormalToGravity( Vec3f::zero() )
 {
 }
 
 Frame::Frame( long long frameId, const std::string& deviceId, const Surface8u& color, 
-			 const Channel16u& depth, const Channel16u& infrared, const std::vector<Skeleton>& skeletons,
-			 const Face& face ) 
+			 const Channel16u& depth, const Channel16u& infrared, const std::vector<Skeleton>& skeletons, 
+			 const Face& face, const Vec4f& floorClipPlane, const Vec3f& normalToGravity ) 
 : mColorSurface( color ), mDepthChannel( depth ), mDeviceId( deviceId ), mFace( face ), 
-mFrameId( frameId ), mInfraredChannel( infrared ), mSkeletons( skeletons )
+mFloorClipPlane( floorClipPlane ), mFrameId( frameId ), mInfraredChannel( infrared ), 
+mNormalToGravity( normalToGravity ), mSkeletons( skeletons )
 {
 }
 
@@ -1013,6 +1019,11 @@ const Face&	Frame::getFace() const
 	return mFace;
 }
 
+const Vec4f& Frame::getFloorClipPlane() const 
+{
+	return mFloorClipPlane;
+}
+
 long long Frame::getFrameId() const
 {
 	return mFrameId;
@@ -1021,6 +1032,11 @@ long long Frame::getFrameId() const
 const Channel16u& Frame::getInfraredChannel() const
 {
 	return mInfraredChannel;
+}
+
+const Vec3f& Frame::getNormalToGravity() const 
+{
+	return mNormalToGravity;
 }
 
 const vector<Skeleton>&	Frame::getSkeletons() const
@@ -1489,6 +1505,9 @@ void Device::update()
 		return;
 	}
 
+	Vec4f floorClipPlane	= Vec4f::zero();
+	Vec3f normalToGravity	= Vec3f::zero();
+
 	if ( mSurfaceColor ) {
 		mSurfaceColor.reset();
 	}
@@ -1523,6 +1542,8 @@ void Device::update()
 	NUI_SKELETON_FRAME skeletonFrame;
 	if ( mDeviceOptions.isUserTrackingEnabled() && 
 		SUCCEEDED( KinectGetSkeletonFrame( mDeviceOptions.getDeviceHandle(), &skeletonFrame ) ) ) {
+		floorClipPlane	= toVec4f( skeletonFrame.vFloorClipPlane );
+		normalToGravity	= toVec3f( skeletonFrame.vNormalToGravity );
 		for ( int32_t i = 0; i < NUI_SKELETON_COUNT; ++i ) {
 			mSkeletons.at( i ).clear();
 			NUI_SKELETON_TRACKING_STATE trackingState = skeletonFrame.SkeletonData[ i ].eTrackingState;
@@ -1548,7 +1569,8 @@ void Device::update()
 	}
 
 	if ( mEventHandler ) {
-		Frame frame( mFrameId, mDeviceOptions.getDeviceId(), mSurfaceColor, mChannelDepth, mChannelInfrared, mSkeletons, mFace );
+		Frame frame( mFrameId, mDeviceOptions.getDeviceId(), mSurfaceColor, mChannelDepth, mChannelInfrared, 
+					 mSkeletons, mFace, floorClipPlane, normalToGravity );
 		mEventHandler( frame );
 	}
 	++mFrameId;
