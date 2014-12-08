@@ -49,34 +49,34 @@ using namespace std;
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 
-Matrix44f toMatrix44f( const Matrix4& m ) 
+mat4 toMat4( const Matrix4& m ) 
 {
-	return Matrix44f( Vec4f( m.M11, m.M12, m.M13, m.M14 ), 
-		Vec4f( m.M21, m.M22, m.M23, m.M24 ), 
-		Vec4f( m.M31, m.M32, m.M33, m.M34 ), 
-		Vec4f( m.M41, m.M42, m.M43, m.M44 ) );
+	return mat4( vec4( m.M11, m.M12, m.M13, m.M14 ), 
+		vec4( m.M21, m.M22, m.M23, m.M24 ), 
+		vec4( m.M31, m.M32, m.M33, m.M34 ), 
+		vec4( m.M41, m.M42, m.M43, m.M44 ) );
 }
 
-Quatf toQuatf( const Vector4& v ) 
+quat toQuat( const Vector4& v ) 
 {
-	return Quatf( v.w, v.x, v.y, v.z );
+	return quat( v.w, v.x, v.y, v.z );
 }
 
-Vec3f toVec3f( const Vector4& v ) 
+vec3 toVec3( const Vector4& v ) 
 {
-	return Vec3f( v.x, v.y, v.z );
+	return vec3( v.x, v.y, v.z );
 }
 
-Vec4f toVec4f( const Vector4& v ) 
+vec4 toVec4( const Vector4& v ) 
 {
-	return Vec4f( v.x, v.y, v.z, v.w );
+	return vec4( v.x, v.y, v.z, v.w );
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 
 Face::Face()
 {
-	mPoseMatrix.setToNull();
+	mPoseMatrix = mat4( 0.0f );
 	mUserId = 0;
 }
 
@@ -100,7 +100,7 @@ const TriMeshRef& Face::getMesh2d() const
 	return mMesh2d;
 }
 
-const Matrix44f& Face::getPoseMatrix() const
+const mat4& Face::getPoseMatrix() const
 {
 	return mPoseMatrix;
 }
@@ -265,7 +265,7 @@ void FaceTracker::stop()
 	}
 }
 
-void FaceTracker::update( const Surface8u& color, const Channel16u& depth, const Vec3f headPoints[ 2 ], size_t userId )
+void FaceTracker::update( const Surface8u& color, const Channel16u& depth, const vec3 headPoints[ 2 ], size_t userId )
 {
 	if ( mNewFace && mEventHandler != nullptr ) {
 		mEventHandler( mFace );
@@ -350,14 +350,14 @@ void FaceTracker::run()
 					float translation[ 3 ];
 					hr = mResult->Get3DPose( &scale, rotation, translation );
 					if ( SUCCEEDED( hr ) ) {
-						Vec3f r( rotation[ 0 ], rotation[ 1 ], rotation[ 2 ] );
-						Vec3f t( translation[ 0 ], translation[ 1 ], translation[ 2 ] );
+						vec3 r( rotation[ 0 ], rotation[ 1 ], rotation[ 2 ] );
+						vec3 t( translation[ 0 ], translation[ 1 ], translation[ 2 ] );
 
 						face.mPoseMatrix.translate( t );
 						face.mPoseMatrix.rotate( r );
 						face.mPoseMatrix.translate( -t );
 						face.mPoseMatrix.translate( t );
-						face.mPoseMatrix.scale( Vec3f::one() * scale );
+						face.mPoseMatrix.scale( vec3::one() * scale );
 					}
 
 					size_t numVertices	= mModel->GetVertexCount();
@@ -369,7 +369,7 @@ void FaceTracker::run()
 							hr = mModel->Get3DShape( shapeUnits, numShapeUnits, animationUnits, numAnimationUnits, scale, rotation, translation, pts, numVertices );
 							if ( SUCCEEDED( hr ) ) {
 								for ( size_t i = 0; i < numVertices; ++i ) {
-									Vec3f v( pts[ i ].x, pts[ i ].y, pts[ i ].z );
+									vec3 v( pts[ i ].x, pts[ i ].y, pts[ i ].z );
 									face.mMesh->appendVertex( v );
 								}
 
@@ -393,8 +393,8 @@ void FaceTracker::run()
 								numAnimationUnits, scale, rotation, translation, pts, numVertices );
 							if ( SUCCEEDED( hr ) ) {
 								for ( size_t i = 0; i < numVertices; ++i ) {
-									Vec2f v( pts[ i ].x + 0.5f, pts[ i ].y + 0.5f );
-									face.mMesh2d->appendVertex( Vec3f( v.x, v.y, 0.0f ) );
+									vec2 v( pts[ i ].x + 0.5f, pts[ i ].y + 0.5f );
+									face.mMesh2d->appendVertex( vec3( v.x, v.y, 0.0f ) );
 								}
 
 								FT_TRIANGLE* triangles	= 0;
@@ -509,22 +509,22 @@ bool DepthProcessOptions::isUserColorEnabled() const
 
 Bone::Bone( const Vector4& position, const _NUI_SKELETON_BONE_ORIENTATION& bone, JointTrackingState trackingState )
 {
-	mAbsRotQuat		= toQuatf( bone.absoluteRotation.rotationQuaternion );
-	mAbsRotMat		= toMatrix44f( bone.absoluteRotation.rotationMatrix );
+	mAbsRotQuat		= toQuat( bone.absoluteRotation.rotationQuaternion );
+	mAbsRotMat		= toMat4( bone.absoluteRotation.rotationMatrix );
 	mJointEnd		= bone.endJoint;
 	mJointStart		= bone.startJoint;
-	mPosition		= toVec3f( position );
-	mRotQuat		= toQuatf( bone.hierarchicalRotation.rotationQuaternion );
-	mRotMat			= toMatrix44f( bone.hierarchicalRotation.rotationMatrix );
+	mPosition		= toVec3( position );
+	mRotQuat		= toQuat( bone.hierarchicalRotation.rotationQuaternion );
+	mRotMat			= toMat4( bone.hierarchicalRotation.rotationMatrix );
 	mTrackingState	= trackingState;
 }
 
-const Quatf& Bone::getAbsoluteRotation() const 
+const quat& Bone::getAbsoluteRotation() const 
 { 
 	return mAbsRotQuat; 
 }
 
-const Matrix44f& Bone::getAbsoluteRotationMatrix() const 
+const mat4& Bone::getAbsoluteRotationMatrix() const 
 { 
 	return mAbsRotMat; 
 }
@@ -534,17 +534,17 @@ JointName Bone::getEndJoint() const
 	return mJointEnd;
 }
 
-const Vec3f& Bone::getPosition() const 
+const vec3& Bone::getPosition() const 
 { 
 	return mPosition; 
 }
 
-const Quatf& Bone::getRotation() const 
+const quat& Bone::getRotation() const 
 { 
 	return mRotQuat; 
 }
 
-const Matrix44f& Bone::getRotationMatrix() const 
+const mat4& Bone::getRotationMatrix() const 
 { 
 	return mRotMat; 
 }
@@ -692,7 +692,7 @@ void CALLBACK deviceStatus( long hr, const wchar_t *instanceName, const wchar_t 
 	}
 }
 
-float getDepthAtCoord( const Channel16u& depth, const Vec2i& v ) 
+float getDepthAtCoord( const Channel16u& depth, const ivec2& v ) 
 {
 	float depthNorm	= 0.0f;
 	if ( depth ) {
@@ -732,7 +732,7 @@ Colorf getUserColor( uint32_t id )
 	}
 }
 
-uint16_t userIdFromDepthCoord( const Channel16u& depth, const Vec2i& v )
+uint16_t userIdFromDepthCoord( const Channel16u& depth, const ivec2& v )
 {
 	return NuiDepthPixelToPlayerIndex( depth.getValue( v ) );
 }
@@ -811,7 +811,7 @@ ImageResolution DeviceOptions::getColorResolution() const
 	return mColorResolution;
 }
 
-const Vec2i& DeviceOptions::getColorSize() const 
+const ivec2& DeviceOptions::getColorSize() const 
 {
 	return mColorSize;
 }
@@ -821,7 +821,7 @@ ImageResolution DeviceOptions::getDepthResolution() const
 	return mDepthResolution;
 }
 	
-const Vec2i& DeviceOptions::getDepthSize() const
+const ivec2& DeviceOptions::getDepthSize() const
 {
 	return mDepthSize;
 }
@@ -846,7 +846,7 @@ ImageResolution DeviceOptions::getInfraredResolution() const
 	return mInfraredResolution;
 }
 	
-const Vec2i& DeviceOptions::getInfraredSize() const
+const ivec2& DeviceOptions::getInfraredSize() const
 {
 	return mInfraredSize;
 }
@@ -901,14 +901,14 @@ DeviceOptions& DeviceOptions::setColorResolution( const ImageResolution& resolut
 	mColorResolution		= resolution;
 	switch ( mColorResolution ) {
 	case ImageResolution::NUI_IMAGE_RESOLUTION_1280x960:
-		mColorSize			= Vec2i( 1280, 960 );
+		mColorSize			= ivec2( 1280, 960 );
 		break;
 	case ImageResolution::NUI_IMAGE_RESOLUTION_640x480:
-		mColorSize			= Vec2i( 640, 480 );
+		mColorSize			= ivec2( 640, 480 );
 		break;
 	default:
 		mColorResolution	= NUI_IMAGE_RESOLUTION_INVALID;
-		mColorSize			= Vec2i::zero();
+		mColorSize			= ivec2( 0 );
 		mEnabledColor		= false;
 		break;
 	}
@@ -920,17 +920,17 @@ DeviceOptions& DeviceOptions::setDepthResolution( const ImageResolution& resolut
 	mDepthResolution		= resolution;
 	switch ( mDepthResolution ) {
 	case ImageResolution::NUI_IMAGE_RESOLUTION_640x480:
-		mDepthSize			= Vec2i( 640, 480 );
+		mDepthSize			= ivec2( 640, 480 );
 		break;
 	case ImageResolution::NUI_IMAGE_RESOLUTION_320x240:
-		mDepthSize			= Vec2i( 320, 240 );
+		mDepthSize			= ivec2( 320, 240 );
 		break;
 	case ImageResolution::NUI_IMAGE_RESOLUTION_80x60:
-		mDepthSize			= Vec2i( 80, 60 );
+		mDepthSize			= ivec2( 80, 60 );
 		break;
 	default:
 		mDepthResolution	= NUI_IMAGE_RESOLUTION_INVALID;
-		mDepthSize			= Vec2i::zero();
+		mDepthSize			= ivec2( 0 );
 		mEnabledDepth		= false;
 		break;
 	}
@@ -954,17 +954,17 @@ DeviceOptions& DeviceOptions::setInfraredResolution( const ImageResolution& reso
 	mInfraredResolution		= resolution;
 	switch ( mInfraredResolution ) {
 	case ImageResolution::NUI_IMAGE_RESOLUTION_640x480:
-		mInfraredSize		= Vec2i( 640, 480 );
+		mInfraredSize		= ivec2( 640, 480 );
 		break;
 	case ImageResolution::NUI_IMAGE_RESOLUTION_320x240:
-		mInfraredSize		= Vec2i( 320, 240 );
+		mInfraredSize		= ivec2( 320, 240 );
 		break;
 	case ImageResolution::NUI_IMAGE_RESOLUTION_80x60:
-		mInfraredSize		= Vec2i( 80, 60 );
+		mInfraredSize		= ivec2( 80, 60 );
 		break;
 	default:
 		mInfraredResolution	= NUI_IMAGE_RESOLUTION_INVALID;
-		mInfraredSize		= Vec2i::zero();
+		mInfraredSize		= ivec2( 0 );
 		mEnabledInfrared	= false;
 		break;
 	}
@@ -986,13 +986,13 @@ DeviceOptions& DeviceOptions::setSkeletonTransform( SkeletonTransform transform 
 //////////////////////////////////////////////////////////////////////////////////////////////
 
 Frame::Frame()
-	: mDeviceId( "" ), mFloorClipPlane( Vec4f::zero() ), mFrameId( 0 ), mNormalToGravity( Vec3f::zero() )
+	: mDeviceId( "" ), mFloorClipPlane( vec4( 0.0f ) ), mFrameId( 0 ), mNormalToGravity( vec3( 0.0f ) )
 {
 }
 
 Frame::Frame( long long frameId, const std::string& deviceId, const Surface8u& color, 
 			 const Channel16u& depth, const Channel16u& infrared, const std::vector<Skeleton>& skeletons, 
-			 const Face& face, const Vec4f& floorClipPlane, const Vec3f& normalToGravity ) 
+			 const Face& face, const vec4& floorClipPlane, const vec3& normalToGravity ) 
 : mColorSurface( color ), mDepthChannel( depth ), mDeviceId( deviceId ), mFace( face ), 
 mFloorClipPlane( floorClipPlane ), mFrameId( frameId ), mInfraredChannel( infrared ), 
 mNormalToGravity( normalToGravity ), mSkeletons( skeletons )
@@ -1019,7 +1019,7 @@ const Face&	Frame::getFace() const
 	return mFace;
 }
 
-const Vec4f& Frame::getFloorClipPlane() const 
+const vec4& Frame::getFloorClipPlane() const 
 {
 	return mFloorClipPlane;
 }
@@ -1034,7 +1034,7 @@ const Channel16u& Frame::getInfraredChannel() const
 	return mInfraredChannel;
 }
 
-const Vec3f& Frame::getNormalToGravity() const 
+const vec3& Frame::getNormalToGravity() const 
 {
 	return mNormalToGravity;
 }
@@ -1151,13 +1151,13 @@ const FaceTrackerRef& Device::getFaceTracker() const
 	return mFaceTracker;
 }
 
-Quatf Device::getOrientation() const
+quat Device::getOrientation() const
 {
 	Vector4 v;
 	if ( mNuiSensor != 0 ) {
 		mNuiSensor->NuiAccelerometerGetCurrentReading( &v );
 	}
-	return toQuatf( v );
+	return toQuat( v );
 }
 
 int32_t Device::getTilt()
@@ -1209,7 +1209,7 @@ bool Device::isCapturing() const
 	return mCapture; 
 }
 
-Vec2i Device::mapColorCoordToDepth( const Vec2i& v )
+ivec2 Device::mapColorCoordToDepth( const ivec2& v )
 {
 	long x;
 	long y;
@@ -1223,10 +1223,10 @@ Vec2i Device::mapColorCoordToDepth( const Vec2i& v )
 			errorNui( hr );
 		}
 	}
-	return Vec2i( (int32_t)x, (int32_t)y );
+	return ivec2( (int32_t)x, (int32_t)y );
 }
 
-Vec2i Device::mapDepthCoordToColor( const Vec2i& v )
+ivec2 Device::mapDepthCoordToColor( const ivec2& v )
 {
 	NUI_COLOR_IMAGE_POINT mapped;
 	if ( mChannelDepth && mCoordinateMapper ) {
@@ -1243,10 +1243,10 @@ Vec2i Device::mapDepthCoordToColor( const Vec2i& v )
 			errorNui( hr );
 		}
 	}
-	return Vec2i( mapped.x, mapped.y );
+	return ivec2( mapped.x, mapped.y );
 }
 
-Vec2i Device::mapSkeletonCoordToColor( const Vec3f& v )
+ivec2 Device::mapSkeletonCoordToColor( const vec3& v )
 {
 	NUI_COLOR_IMAGE_POINT mapped;
 	if ( mCoordinateMapper ) {
@@ -1263,10 +1263,10 @@ Vec2i Device::mapSkeletonCoordToColor( const Vec3f& v )
 			errorNui( hr );
 		}
 	}
-	return Vec2i( mapped.x, mapped.y );
+	return ivec2( mapped.x, mapped.y );
 }
 
-Vec2i Device::mapSkeletonCoordToDepth( const Vec3f& v )
+ivec2 Device::mapSkeletonCoordToDepth( const vec3& v )
 {
 	NUI_DEPTH_IMAGE_POINT mapped;
 	if ( mCoordinateMapper ) {
@@ -1282,7 +1282,7 @@ Vec2i Device::mapSkeletonCoordToDepth( const Vec3f& v )
 			errorNui( hr );
 		}
 	}
-	return Vec2i( mapped.x, mapped.y );
+	return ivec2( mapped.x, mapped.y );
 }
 
 void Device::setTilt( int32_t degrees )
@@ -1505,8 +1505,8 @@ void Device::update()
 		return;
 	}
 
-	Vec4f floorClipPlane	= Vec4f::zero();
-	Vec3f normalToGravity	= Vec3f::zero();
+	vec4 floorClipPlane		= vec4( 0.0f );
+	vec3 normalToGravity	= vec3( 0.0f );
 
 	if ( mSurfaceColor ) {
 		mSurfaceColor.reset();
@@ -1542,8 +1542,8 @@ void Device::update()
 	NUI_SKELETON_FRAME skeletonFrame;
 	if ( mDeviceOptions.isUserTrackingEnabled() && 
 		SUCCEEDED( KinectGetSkeletonFrame( mDeviceOptions.getDeviceHandle(), &skeletonFrame ) ) ) {
-		floorClipPlane	= toVec4f( skeletonFrame.vFloorClipPlane );
-		normalToGravity	= toVec3f( skeletonFrame.vNormalToGravity );
+		floorClipPlane	= toVec4( skeletonFrame.vFloorClipPlane );
+		normalToGravity	= toVec3( skeletonFrame.vNormalToGravity );
 		for ( int32_t i = 0; i < NUI_SKELETON_COUNT; ++i ) {
 			mSkeletons.at( i ).clear();
 			NUI_SKELETON_TRACKING_STATE trackingState = skeletonFrame.SkeletonData[ i ].eTrackingState;

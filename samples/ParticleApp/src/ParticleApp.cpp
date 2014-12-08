@@ -66,12 +66,12 @@ private:
 	ci::gl::TextureRef			mTextureVelocity[ 2 ];
 	
 	ci::CameraPersp				mCamera;
-	ci::Vec3f					mEyePoint;
-	ci::Vec3f					mLookAt;
+	ci::vec3					mEyePoint;
+	ci::vec3					mLookAt;
 	float						mPointCloudDepth;
 
 	float						mParticleDampen;
-	ci::Vec3f					mParticleCenter;
+	ci::vec3					mParticleCenter;
 	float						mParticleSpeed;
 	float						mParticleTrails;
 	
@@ -246,7 +246,7 @@ void ParticleApp::setup()
 
 	mDrawParams			= true;
 	mDrawTextures		= false;
-	mEyePoint			= Vec3f( 0.0f, 0.0f, 3000.0f );
+	mEyePoint			= vec3( 0.0f, 0.0f, 3000.0f );
 	mFrameRate			= 0.0f;
 	mFullScreen			= isFullScreen();
 	mFullScreenPrev		= mFullScreen;
@@ -295,8 +295,8 @@ void ParticleApp::setup()
 	
 	struct Vertex
 	{
-		Vec3f position;
-		Vec2f texCoord;
+		vec3 position;
+		vec2 texCoord;
 	};
 	vector<Vertex> vertices;
 	vector<uint32_t> indices;
@@ -304,8 +304,8 @@ void ParticleApp::setup()
 		for ( int32_t y = 0; y < h; ++y ) {
 			indices.push_back( (uint32_t)( x * h + y ) );
 			Vertex vertex;
-			vertex.texCoord = Vec2f( (float)x / (float)( w - 1 ), (float)y / (float)( h - 1 ) );
-			vertex.position = Vec3f(
+			vertex.texCoord = vec2( (float)x / (float)( w - 1 ), (float)y / (float)( h - 1 ) );
+			vertex.position = vec3(
 				( vertex.texCoord.x * 2.0f - 1.0f ) * (float)h, 
 				( vertex.texCoord.y * 2.0f - 1.0f ) * (float)w, 
 				0.0f );
@@ -330,8 +330,7 @@ void ParticleApp::setup()
 	textureFormat.setMagFilter( GL_NEAREST );
 	textureFormat.setMinFilter( GL_NEAREST );
 	textureFormat.setWrap( GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE );
-	textureFormat.setPixelDataFormat( GL_RGBA );
-	textureFormat.setPixelDataType( GL_FLOAT );
+	textureFormat.setDataType( GL_FLOAT );
 
 	for ( size_t i = 0; i < 2; ++i ) {
 		mTexturePosition[ i ] = gl::Texture2d::create( w, h, textureFormat );
@@ -353,7 +352,7 @@ void ParticleApp::setup()
 	////////////////////////////////////////////////////////////////
 	// Set up parameters
 
-	mParams = params::InterfaceGl::create( "PARAMS", Vec2i( 200, 400 ) );
+	mParams = params::InterfaceGl::create( "PARAMS", ivec2( 200, 400 ) );
 	mParams->addParam( "Frame rate",		&mFrameRate,			"", true );
 	mParams->addParam( "Full screen",		&mFullScreen,			"key=f" );
 	mParams->addButton( "Quit",				[ & ]() { quit(); },	"key=q" );

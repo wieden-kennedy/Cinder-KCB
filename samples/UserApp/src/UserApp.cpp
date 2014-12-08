@@ -39,7 +39,6 @@
 #include "cinder/gl/Context.h"
 #include "cinder/gl/Texture.h"
 #include "cinder/params/Params.h"
-#include "FaceTracker.h"
 #include "Kinect.h"
 
 class UserApp : public ci::app::AppBasic 
@@ -52,7 +51,7 @@ private:
 	MsKinect::DeviceRef			mDevice;
 	MsKinect::Frame				mFrame;
 	
-	MsKinect::FaceTracker::Face	mFace;
+	MsKinect::Face				mFace;
 	MsKinect::FaceTrackerRef	mFaceTracker;
 };
 
@@ -75,14 +74,14 @@ void UserApp::draw()
 		gl::disable( GL_TEXTURE_2D );
 
 		gl::pushMatrices();
-		gl::scale( Vec2f( getWindowSize() ) / Vec2f( tex->getSize() ) );
+		gl::scale( vec2( getWindowSize() ) / vec2( tex->getSize() ) );
 
 		for ( const auto& skeleton : mFrame.getSkeletons() ) {
 			for ( const auto& joint : skeleton ) {
 				const MsKinect::Bone& bone = joint.second;
 
-				Vec2i v0 = mDevice->mapSkeletonCoordToDepth( bone.getPosition() );
-				Vec2i v1 = mDevice->mapSkeletonCoordToDepth( skeleton.at( bone.getStartJoint() ).getPosition() );
+				ivec2 v0 = mDevice->mapSkeletonCoordToDepth( bone.getPosition() );
+				ivec2 v1 = mDevice->mapSkeletonCoordToDepth( skeleton.at( bone.getStartJoint() ).getPosition() );
 				gl::drawLine( v0, v1 );
 				gl::drawSolidCircle( v0, 5.0f, 16 );
 			}
@@ -150,7 +149,7 @@ void UserApp::setup()
 	mFaceTracker = MsKinect::FaceTracker::create();
 	mFaceTracker->enableCalcMesh( false );
 	mFaceTracker->enableCalcMesh2d();
-	mFaceTracker->connectEventHander( [ & ]( MsKinect::FaceTracker::Face face ) {
+	mFaceTracker->connectEventHander( [ & ]( MsKinect::Face face ) {
 		mFace = face;
 	} );
 	mFaceTracker->start();
