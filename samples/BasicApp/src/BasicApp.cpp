@@ -34,12 +34,11 @@
 * 
 */
 
-#include "cinder/app/AppBasic.h"
-#include "cinder/app/RendererGl.h"
-#include "cinder/gl/Texture.h"
+#include "cinder/app/App.h"
+#include "cinder/gl/gl.h"
 #include "Kinect.h"
 
-class BasicApp : public ci::app::AppBasic 
+class BasicApp : public ci::app::App 
 {
 public:
 	void 				draw();
@@ -50,6 +49,8 @@ private:
 	ci::gl::TextureRef	mTextureColor;
 	ci::gl::TextureRef	mTextureDepth;
 };
+
+#include "cinder/app/RendererGl.h"
 
 using namespace ci;
 using namespace ci::app;
@@ -86,19 +87,28 @@ void BasicApp::keyDown( KeyEvent event )
 
 void BasicApp::setup()
 {
-	gl::color( ColorAf::white() );
-	gl::enable( GL_TEXTURE_2D );
-	
 	mDevice = MsKinect::Device::create();
 	mDevice->connectEventHandler( [ & ]( MsKinect::Frame frame )
 	{
 		if ( frame.getColorSurface() ) {
-			mTextureColor = gl::Texture::create( frame.getColorSurface() );
+			if ( mTextureColor ) {
+				mTextureColor->update( *frame.getColorSurface() );
+			} else {
+				mTextureColor = gl::Texture::create( *frame.getColorSurface() );
+			}
 		} else if ( frame.getInfraredChannel() ) {
-			mTextureColor = gl::Texture::create( frame.getInfraredChannel() );
+			if ( mTextureColor ) {
+				mTextureColor->update( *frame.getInfraredChannel() );
+			} else {
+				mTextureColor = gl::Texture::create( *frame.getInfraredChannel() );
+			}
 		}
 		if ( frame.getDepthChannel() ) {
-			mTextureDepth = gl::Texture::create( frame.getDepthChannel() );
+			if ( mTextureDepth ) {
+				mTextureDepth->update( *MsKinect::depthChannelToSurface( frame.getDepthChannel() ) );
+			} else {
+				mTextureDepth = gl::Texture::create( *MsKinect::depthChannelToSurface( frame.getDepthChannel() ) );
+			}
 		}
 	} );
 	MsKinect::DeviceOptions options;
@@ -107,5 +117,5 @@ void BasicApp::setup()
 	mDevice->start( options );
 }
 
-CINDER_APP_BASIC( BasicApp, RendererGl )
+CINDER_APP( BasicApp, RendererGl )
  

@@ -102,30 +102,30 @@ class Bone
 {
 public:
 	//! Returns rotation of the bone relative to camera coordinates.
-	const ci::Quatf&					getAbsoluteRotation() const;
+	const ci::quat&						getAbsoluteRotation() const;
 	//! Returns rotation matrix of the bone relative to camera coordinates.
-	const ci::Matrix44f&				getAbsoluteRotationMatrix() const;
+	const ci::mat4&						getAbsoluteRotationMatrix() const;
 	//! Returns index of end joint.
 	JointName							getEndJoint() const;
 	//! Returns position of the bone's start joint.
-	const ci::Vec3f&					getPosition() const;
+	const ci::vec3&						getPosition() const;
 	//! Returns rotation of the bone relative to the parent bone.
-	const ci::Quatf&					getRotation() const;
+	const ci::quat&						getRotation() const;
 	//! Returns rotation matrix of the bone relative to the parent bone.
-	const ci::Matrix44f&				getRotationMatrix() const;
+	const ci::mat4&						getRotationMatrix() const;
 	//! Returns index of start joint.
 	JointName							getStartJoint() const;
 	//! Returns joint tracking state.
 	JointTrackingState					getTrackingState() const;
 private:
 	Bone( const Vector4& position, const _NUI_SKELETON_BONE_ORIENTATION& bone, JointTrackingState trackingState );
-	ci::Matrix44f						mAbsRotMat;
-	ci::Quatf							mAbsRotQuat;
+	ci::mat4							mAbsRotMat;
+	ci::quat							mAbsRotQuat;
 	JointName							mJointEnd;
 	JointName							mJointStart;
-	ci::Vec3f							mPosition;
-	ci::Matrix44f						mRotMat;
-	ci::Quatf							mRotQuat;
+	ci::vec3							mPosition;
+	ci::mat4							mRotMat;
+	ci::quat							mRotQuat;
 	JointTrackingState					mTrackingState;
 
 	friend class						Device;
@@ -143,11 +143,11 @@ public:
 	//! Returns resolution of color image.
 	ImageResolution						getColorResolution() const; 
 	//! Returns size of color image.
-	const ci::Vec2i&					getColorSize() const; 
+	const ci::ivec2&					getColorSize() const; 
 	//! Returns resolution of depth image.
 	ImageResolution						getDepthResolution() const; 
 	//! Returns size of depth image.
-	const ci::Vec2i&					getDepthSize() const;
+	const ci::ivec2&					getDepthSize() const;
 	//! Returns KCB handle for this device.
 	KCBHANDLE							getDeviceHandle() const;
 	//! Returns unique ID for this device.
@@ -157,7 +157,7 @@ public:
 	//! Returns resolution of infrared image.
 	ImageResolution						getInfraredResolution() const; 
 	//! Returns size of infrared image.
-	const ci::Vec2i&					getInfraredSize() const;
+	const ci::ivec2&					getInfraredSize() const;
 	//! Returns skeleton selection mode for this device.
 	SkeletonSelectionMode				getSkeletonSelectionMode() const;
 	//! Returns skeleton transform for this device.
@@ -220,11 +220,11 @@ protected:
 	SkeletonTransform					mSkeletonTransform;
 	
 	ImageResolution						mColorResolution;
-	ci::Vec2i							mColorSize;
+	ci::ivec2							mColorSize;
 	ImageResolution						mDepthResolution;
-	ci::Vec2i							mDepthSize;
+	ci::ivec2							mDepthSize;
 	ImageResolution						mInfraredResolution;
-	ci::Vec2i							mInfraredSize;
+	ci::ivec2							mInfraredSize;
 
 	std::string							mDeviceId;
 	int32_t								mDeviceIndex;
@@ -278,7 +278,7 @@ public:
 		http://msdn.microsoft.com/en-us/library/jj130970.aspx */
 	const AnimationUnitMap&				getAnimationUnits() const;
 	//! Returns rectangle of face location in pixels inside the color image.
-	const ci::Rectf&				getBounds() const;
+	const ci::Rectf&					getBounds() const;
 	/*! Returns 3D TriMesh of face in world space. FaceTracker must 
 		have mesh calculation enabled. */
 	const ci::TriMeshRef&				getMesh() const;
@@ -286,7 +286,7 @@ public:
 		FaceTracker must have 2D mesh calculation enabled. */
 	const ci::TriMeshRef&				getMesh2d() const;
 	//! Returns transform matrix of face's pose.
-	const ci::Matrix44f&				getPoseMatrix() const;
+	const ci::mat4&						getPoseMatrix() const;
 	//! Returns ID provided in FaceTracker::findFaces().
 	size_t								getUserId() const;
 protected:
@@ -294,7 +294,7 @@ protected:
 	ci::Rectf							mBounds;
 	ci::TriMeshRef						mMesh;
 	ci::TriMeshRef						mMesh2d;
-	ci::Matrix44f						mPoseMatrix;
+	ci::mat4							mPoseMatrix;
 	size_t								mUserId;
 
 	friend class						FaceTracker;
@@ -346,8 +346,8 @@ public:
 		neck points together, in order, through \a headPoints to target a user. 
 		The value passed to \a userId will be returned from Face::getUserId() in 
 		the event handler's face argument. */
-	virtual void						update( const ci::Surface8u& color, const ci::Channel16u& depth, 
-		const ci::Vec3f headPoints[ 2 ] = 0, size_t userId = 0 );
+	virtual void						update( const ci::Surface8uRef& color, const ci::Channel16uRef& depth, 
+		const ci::vec3 headPoints[ 2 ] = 0, size_t userId = 0 );
 	
 	//! Set event handler to method with signature void( FaceTracker::Face ).
 	template<typename T, typename Y> 
@@ -370,18 +370,18 @@ protected:
 
 	bool								mCalcMesh;
 	bool								mCalcMesh2d;
-	ci::Channel16u						mChannelDepth;
+	ci::Channel16uRef					mChannelDepth;
 	FT_CAMERA_CONFIG					mConfigColor;
 	FT_CAMERA_CONFIG					mConfigDepth;
 	Face								mFace;
 	IFTFaceTracker*						mFaceTracker;
-	std::vector<ci::Vec3f>				mHeadPoints;
+	std::vector<ci::vec3>				mHeadPoints;
 	KCBHANDLE							mKinect;
 	IFTModel*							mModel;
 	IFTResult*							mResult;
 	FT_SENSOR_DATA						mSensorData;
 	bool								mSuccess;
-	ci::Surface8u						mSurfaceColor;
+	ci::Surface8uRef					mSurfaceColor;
 	size_t								mUserId;
 public:
 
@@ -436,37 +436,37 @@ public:
 	Frame();
 
 	//! Returns color surface for this frame.
-	const ci::Surface8u&				getColorSurface() const;
+	const ci::Surface8uRef&				getColorSurface() const;
 	//! Returns depth channel for this frame.
-	const ci::Channel16u&				getDepthChannel() const;
+	const ci::Channel16uRef&			getDepthChannel() const;
 	//! Returns unique identifier for the sensor that generated the frame.
 	const std::string&					getDeviceId() const;
 	//! Returns face if tracking is enabled.
 	const Face&							getFace() const;
 	//! Returns Vec4f representing floor clip plane when skeleton is present.
-	const ci::Vec4f&					getFloorClipPlane() const;
+	const ci::vec4&						getFloorClipPlane() const;
 	//! Returns unique, sequential frame ID.
 	long long							getFrameId() const;
 	//! Returns infrared channel for this frame.
-	const ci::Channel16u&				getInfraredChannel() const;
+	const ci::Channel16uRef&			getInfraredChannel() const;
 	//! Returns normal to gravity vector when skeleton is present.
-	const ci::Vec3f&					getNormalToGravity() const;
+	const ci::vec3&						getNormalToGravity() const;
 	//! Returns skeletons for this frame.
 	const std::vector<Skeleton>&		getSkeletons() const;
 protected:
-	Frame( long long frameId, const std::string& deviceId, const ci::Surface8u& color, 
-		const ci::Channel16u& depth, const ci::Channel16u& infrared, 
+	Frame( long long frameId, const std::string& deviceId, const ci::Surface8uRef& color, 
+		const ci::Channel16uRef& depth, const ci::Channel16uRef& infrared, 
 		const std::vector<Skeleton>& skeletons, const Face& face, 
-		const ci::Vec4f& floorClipPlane, const ci::Vec3f& normalToGravity );
+		const ci::vec4& floorClipPlane, const ci::vec3& normalToGravity );
 
-	ci::Surface8u						mColorSurface;
-	ci::Channel16u						mDepthChannel;
+	ci::Surface8uRef					mColorSurface;
+	ci::Channel16uRef					mDepthChannel;
 	std::string							mDeviceId;
 	MsKinect::Face						mFace;
-	ci::Vec4f							mFloorClipPlane;
+	ci::vec4							mFloorClipPlane;
 	long long							mFrameId;
-	ci::Channel16u						mInfraredChannel;
-	ci::Vec3f							mNormalToGravity;
+	ci::Channel16uRef					mInfraredChannel;
+	ci::vec3							mNormalToGravity;
 	std::vector<Skeleton>				mSkeletons;
 
 	friend class						Device;
@@ -505,7 +505,7 @@ public:
 	//! Returns the face tracker for this device.
 	const FaceTrackerRef&				getFaceTracker() const;
 	//! Returns accelerometer reading.
-	ci::Quatf							getOrientation() const;
+	ci::quat							getOrientation() const;
 	//! Returns current device angle in degrees between -28 and 28.
 	int32_t								getTilt();
 	//! Returns number of tracked users. Depth resolution must be no more than 320x240 with user tracking enabled.
@@ -518,13 +518,13 @@ public:
 	void								setTilt( int32_t degrees = 0 );
 
 	//! Returns pixel location of color position in depth image.
-	ci::Vec2i							mapColorCoordToDepth( const ci::Vec2i& v );
+	ci::ivec2							mapColorCoordToDepth( const ci::ivec2& v );
 	//! Returns pixel location of color position in depth image.
-	ci::Vec2i							mapDepthCoordToColor( const ci::Vec2i& v );
+	ci::ivec2							mapDepthCoordToColor( const ci::ivec2& v );
 	//! Returns pixel location of skeleton position in color image.
-	ci::Vec2i							mapSkeletonCoordToColor( const ci::Vec3f& v );
+	ci::ivec2							mapSkeletonCoordToColor( const ci::vec3& v );
 	//! Returns pixel location of skeleton position in depth image.
-	ci::Vec2i							mapSkeletonCoordToDepth( const ci::Vec3f& v );
+	ci::ivec2							mapSkeletonCoordToDepth( const ci::vec3& v );
 
 	//! Sets frame event handler. Signature is void( Frame ).
 	template<typename T, typename Y> 
@@ -552,14 +552,14 @@ protected:
 	uint8_t*							mBufferColor;
 	uint8_t*							mBufferDepth;
 	uint8_t*							mBufferInfrared;
-	ci::Channel16u						mChannelDepth;
-	ci::Channel16u						mChannelInfrared;
+	ci::Channel16uRef					mChannelDepth;
+	ci::Channel16uRef					mChannelInfrared;
 	KINECT_IMAGE_FRAME_FORMAT			mFormatColor;
 	KINECT_IMAGE_FRAME_FORMAT			mFormatDepth;
 	KINECT_IMAGE_FRAME_FORMAT			mFormatInfrared;
 	long long							mFrameId;
 	std::vector<Skeleton>				mSkeletons;
-	ci::Surface8u						mSurfaceColor;
+	ci::Surface8uRef					mSurfaceColor;
 	
 	MsKinect::Face						mFace;
 	MsKinect::FaceTrackerRef			mFaceTracker;
@@ -667,18 +667,18 @@ size_t									calcNumUsersFromDepth( const ci::Channel16u& depth );
 	are weighted by distance to torso when \a weighted is true. */
 float									calcSkeletonConfidence( const Skeleton& skeleton, bool weighted = false );
 //! Shifts 16-bit depth data to make it visible.
-ci::Channel8u							channel16To8( const ci::Channel16u& channel );
+ci::Channel8uRef						channel16To8( const ci::Channel16uRef& channel );
 //! Creates a surface with colorized users from \a depth.
-ci::Surface16u							depthChannelToSurface( const ci::Channel16u& depth, 
+ci::Surface16uRef						depthChannelToSurface( const ci::Channel16uRef& depth, 
 															  const DepthProcessOptions& depthProcessOptions = DepthProcessOptions() );
 //! Returns depth value as 0.0 - 1.0 float for pixel at \a pos.
-float									getDepthAtCoord( const ci::Channel16u& depth, const ci::Vec2i& v );
+float									getDepthAtCoord( const ci::Channel16uRef& depth, const ci::ivec2& v );
 //! Returns number of Kinect devices.
 size_t									getDeviceCount();
 //! Returns use color for user ID \a id.
 ci::Colorf								getUserColor( uint32_t id );
 //! Returns user ID for pixel at \a coord in \a depth. 0 is no user.
-uint16_t								userIdFromDepthCoord( const ci::Channel16u& depth, const ci::Vec2i& v );
+uint16_t								userIdFromDepthCoord( const ci::Channel16uRef& depth, const ci::ivec2& v );
 
 }
  

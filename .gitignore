@@ -3,3 +3,18 @@ ipch
 *.sdf
 *.suo
 *.user
+
+[Dd]ebug/
+[Rr]elease/
+[Bb]in/
+
+## Allow specific files and folders
+!lib/x64/dll/Debug/
+!lib/x64/dll/Release/
+!lib/x64/lib/Debug/
+!lib/x64/lib/Release/
+
+!lib/x86/dll/Debug/
+!lib/x86/dll/Release/
+!lib/x86/lib/Debug/
+!lib/x86/lib/Release/
